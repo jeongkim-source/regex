@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keycloak Name &amp; Email Validation — SME Test Harness</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --ink: #1b1f24;
+    --ink-soft: #5b6673;
+    --ink-faint: #8a94a1;
+    --line: #e2e6eb;
+    --line-soft: #eef1f4;
+    --accent: #2f5fd0;
+    --pass-bg: #e9f7ef;
+    --pass-line: #34a853;
+    --pass-ink: #176b34;
+    --fail-bg: #fdecec;
+    --fail-line: #d93025;
+    --fail-ink: #a52318;
+    --note-bg: #fff8e6;
+    --note-line: #e0a92c;
+    --note-ink: #8a6415;
+    --code-bg: #f1f3f6;
+    --radius: 10px;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --jp: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", "MS PGothic", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171b; --panel: #1c2026; --ink: #e6e9ed; --ink-soft: #a3adba;
+      --ink-faint: #79838f; --line: #2c3239; --line-soft: #23282e; --accent: #6c98f0;
+      --pass-bg: #16281c; --pass-line: #3fa860; --pass-ink: #7fd79b;
+      --fail-bg: #2c1a19; --fail-line: #e05b50; --fail-ink: #f0938b;
+      --note-bg: #2a2415; --note-line: #c9992c; --note-ink: #e3c675;
+      --code-bg: #23282e;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 28px 20px 80px;
+    background: var(--bg); color: var(--ink);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, var(--jp);
+  }
+  .wrap { max-width: 940px; margin: 0 auto; }
+  header.page { margin-bottom: 22px; }
+  header.page h1 { font-size: 22px; margin: 0 0 6px; letter-spacing: -0.01em; }
+  header.page p { margin: 0; color: var(--ink-soft); font-size: 13.5px; }
+  .meta { margin-top: 10px; font-size: 12px; color: var(--ink-faint); font-family: var(--mono); }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 18px 20px; margin-bottom: 16px;
+  }
+  .card > h2 {
+    font-size: 15px; margin: 0 0 2px; display: flex; align-items: baseline; gap: 9px;
+  }
+  .card > h2 .jp { font-size: 13px; color: var(--ink-soft); font-weight: 500; }
+  .hint { font-size: 12.5px; color: var(--ink-soft); margin: 0 0 14px; }
+
+  .quick { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .quick button {
+    font: 500 12px/1 inherit; font-family: inherit;
+    padding: 6px 10px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--panel); color: var(--ink-soft);
+    transition: .12s;
+  }
+  .quick button:hover { border-color: var(--accent); color: var(--accent); }
+  .quick button.ok   { border-left: 3px solid var(--pass-line); }
+  .quick button.bad  { border-left: 3px solid var(--fail-line); }
+  .quick button.warn { border-left: 3px solid var(--note-line); }
+
+  .row { display: flex; gap: 10px; align-items: stretch; }
+  input[type=text] {
+    flex: 1; min-width: 0; padding: 11px 13px; font: 15px/1.4 inherit; font-family: inherit;
+    border: 1.5px solid var(--line); border-radius: 8px;
+    background: var(--panel); color: var(--ink);
+  }
+  input[type=text]:focus { outline: none; border-color: var(--accent); }
+  input.pass { border-color: var(--pass-line); }
+  input.fail { border-color: var(--fail-line); }
+  .clear {
+    padding: 0 12px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--panel); color: var(--ink-faint); cursor: pointer; font-size: 13px;
+  }
+  .clear:hover { color: var(--fail-line); border-color: var(--fail-line); }
+
+  .badge {
+    display: inline-block; margin-top: 11px; padding: 4px 11px; border-radius: 5px;
+    font: 700 11.5px/1.5 var(--mono); letter-spacing: .07em;
+  }
+  .badge.pass { background: var(--pass-bg); color: var(--pass-ink); border: 1px solid var(--pass-line); }
+  .badge.fail { background: var(--fail-bg); color: var(--fail-ink); border: 1px solid var(--fail-line); }
+  .badge.idle { background: var(--code-bg); color: var(--ink-faint); border: 1px solid var(--line); }
+
+  ul.msgs { list-style: none; margin: 10px 0 0; padding: 0; }
+  ul.msgs li {
+    padding: 8px 11px; border-radius: 6px; margin-bottom: 6px;
+    font-size: 13px; border-left: 3px solid;
+  }
+  li.err  { background: var(--fail-bg); border-color: var(--fail-line); color: var(--fail-ink); }
+  li.note { background: var(--note-bg); border-color: var(--note-line); color: var(--note-ink); }
+  li.ok   { background: var(--pass-bg); border-color: var(--pass-line); color: var(--pass-ink); }
+  ul.msgs code { font-family: var(--mono); font-size: 12px; }
+
+  details.rule { margin-top: 12px; border-top: 1px dashed var(--line); padding-top: 10px; }
+  details.rule summary {
+    cursor: pointer; font-size: 12px; color: var(--ink-soft);
+    font-weight: 600; user-select: none;
+  }
+  details.rule summary:hover { color: var(--accent); }
+  .rulebody { margin-top: 9px; font-size: 12.5px; color: var(--ink-soft); }
+  pre.re {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px;
+    padding: 9px 11px; overflow-x: auto; font-family: var(--mono);
+    font-size: 11.5px; line-height: 1.5; margin: 6px 0 10px; color: var(--ink);
+  }
+  table.chars { border-collapse: collapse; width: 100%; font-size: 12px; margin-top: 8px; }
+  table.chars th, table.chars td {
+    border: 1px solid var(--line); padding: 4px 7px; text-align: left;
+    font-family: var(--mono);
+  }
+  table.chars th { background: var(--code-bg); color: var(--ink-soft); font-weight: 600; }
+  table.chars td.bad { background: var(--fail-bg); color: var(--fail-ink); }
+  .kv { font-family: var(--mono); font-size: 12px; }
+  .kv b { color: var(--ink-soft); font-weight: 600; }
+  .swatch {
+    display: inline-block; padding: 2px 6px; background: var(--code-bg);
+    border: 1px solid var(--line); border-radius: 4px; font-family: var(--mono);
+    font-size: 12.5px; white-space: pre;
+  }
+
+  #suite button {
+    font: 600 13px/1 inherit; font-family: inherit; padding: 9px 16px; border-radius: 7px;
+    border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer;
+  }
+  #suite button:hover { filter: brightness(1.08); }
+  #suiteOut { margin-top: 12px; font-size: 13px; }
+  #suiteOut table { border-collapse: collapse; width: 100%; font-size: 12px; margin-top: 9px; }
+  #suiteOut th, #suiteOut td { border: 1px solid var(--line); padding: 5px 8px; text-align: left; }
+  #suiteOut th { background: var(--code-bg); color: var(--ink-soft); }
+  #suiteOut td.v { font-family: var(--mono); }
+  #suiteOut tr.f td { background: var(--fail-bg); color: var(--fail-ink); }
+  .tally { font: 700 13px var(--mono); }
+  .tally.good { color: var(--pass-ink); }
+  .tally.bad  { color: var(--fail-ink); }
+  footer { margin-top: 26px; font-size: 12px; color: var(--ink-faint); line-height: 1.7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="page">
+    <h1>Keycloak Name &amp; Email Validation — SME Test Harness</h1>
+    <p>Type or click a preset. Each field runs the full production pipeline: reject invisible characters → normalize width → trim → validate. The <b>Normalization</b> panel shows exactly what would be stored.</p>
+    <div class="meta">Rules per keycloak-user-attribute-validation-rules.md · name max 64 · email max 255 / local max 64</div>
+  </header>
+
+  <!-- ================= EMAIL ================= -->
+  <section class="card" id="card-email">
+    <h2>Email Address <span class="jp">メールアドレス</span></h2>
+    <p class="hint">Local part (before <code>@</code>) must be ASCII. Internationalised domains (<span class="swatch">日本語.jp</span>) are accepted — Keycloak converts them to punycode.</p>
+    <div class="quick" data-for="email"></div>
+    <div class="row">
+      <input type="text" id="email" autocomplete="off" spellcheck="false" placeholder="taro@example.com">
+      <button class="clear" data-clear="email" title="Clear">✕</button>
+    </div>
+    <div id="email-badge"></div>
+    <ul class="msgs" id="email-msgs"></ul>
+    <details class="rule">
+      <summary>Active rule &amp; regex</summary>
+      <div class="rulebody">
+        <b>Local part</b> — ASCII letters, digits and <code>! # $ % &amp; ' * + / = ? ^ _ ` { | } ~ -</code>, in dot-separated groups. Max 64.
+        <pre class="re" id="re-email-local"></pre>
+        <b>Domain</b> — dot-separated labels, letters/digits/hyphen, hyphen not at either end. Unicode letters allowed (IDN). TLD ≥ 2 letters.
+        <pre class="re" id="re-email-domain"></pre>
+        <b>Normalization</b> — full NFKC, then trim, then lowercase. Safe here because the field holds no kanji.
+      </div>
+    </details>
+  </section>
+
+  <!-- ================= LAST NAME ================= -->
+  <section class="card" id="card-last">
+    <h2>Last Name (Family Name) <span class="jp">姓 / セイ</span></h2>
+    <p class="hint">Listed before the given name, matching Japanese order. Kanji, hiragana, full-width katakana and Latin are accepted.</p>
+    <div class="quick" data-for="last"></div>
+    <div class="row">
+      <input type="text" id="last" autocomplete="off" spellcheck="false" placeholder="山田">
+      <button class="clear" data-clear="last" title="Clear">✕</button>
+    </div>
+    <div id="last-badge"></div>
+    <ul class="msgs" id="last-msgs"></ul>
+    <details class="rule">
+      <summary>Active rule &amp; regex</summary>
+      <div class="rulebody" data-namerule></div>
+    </details>
+  </section>
+
+  <!-- ================= FIRST NAME ================= -->
+  <section class="card" id="card-first">
+    <h2>First Name (Given Name) <span class="jp">名 / メイ</span></h2>
+    <p class="hint">Same rule as the family name.</p>
+    <div class="quick" data-for="first"></div>
+    <div class="row">
+      <input type="text" id="first" autocomplete="off" spellcheck="false" placeholder="太郎">
+      <button class="clear" data-clear="first" title="Clear">✕</button>
+    </div>
+    <div id="first-badge"></div>
+    <ul class="msgs" id="first-msgs"></ul>
+    <details class="rule">
+      <summary>Active rule &amp; regex</summary>
+      <div class="rulebody" data-namerule></div>
+    </details>
+  </section>
+
+  <!-- ================= SELF TEST ================= -->
+  <section class="card" id="suite">
+    <h2>Built-in regression suite</h2>
+    <p class="hint">Runs every fixture from the specification against the logic on this page. Use this to confirm the harness itself is behaving before you trust a manual result.</p>
+    <button id="runSuite">Run all fixtures</button>
+    <div id="suiteOut"></div>
+  </section>
+
+  <footer>
+    Server-side authority is Keycloak's User Profile config; this page mirrors it for review purposes.
+    The email check is a faithful approximation of Keycloak's built-in <code>email</code> validator, not a byte-identical copy —
+    report any input where you believe the two would disagree.
+  </footer>
+</div>
+
+<script>
+"use strict";
+
+/* ---------------------------------------------------------------
+   1. CONSTANTS — mirror the specification exactly
+   --------------------------------------------------------------- */
+const LIMIT = { NAME_MAX: 64, EMAIL_MAX: 255, EMAIL_LOCAL_MAX: 64 };
+
+// Invisible / control characters. NFKC does NOT remove these, so they are
+// rejected explicitly before anything else runs.
+const INVISIBLE = /[\u0000-\u001F\u007F\u00AD\u200B-\u200D\u2028\u2029\u202A-\u202E\u2066-\u2069\uFEFF]/g;
+// Non-global twin: a /g regex carries lastIndex state and must not be reused for single tests.
+const INVISIBLE_ONE = /[\u0000-\u001F\u007F\u00AD\u200B-\u200D\u2028\u2029\u202A-\u202E\u2066-\u2069\uFEFF]/;
+
+// Person name: Latin + Han + Hiragana + full-width katakana + name punctuation.
+// Explicit katakana ranges are used instead of \p{Script=Katakana} because that
+// property also matches HALF-WIDTH katakana (U+FF61-FF9F), which must be blocked.
+// The leading lookahead rejects whitespace-only values: Java's String.trim()
+// does not strip U+3000, so length>=1 alone would let a blank name through.
+const NAME_RE = /^(?![ 　]+$)[\p{Script=Latin}\p{Script=Han}\p{Script=Hiragana}ァ-ヺー-ヾ々〆・　 '’.\-]{1,64}$/u;
+
+// Single-character form of the class above, for per-character diagnostics.
+const NAME_CHAR_RE = /^[\p{Script=Latin}\p{Script=Han}\p{Script=Hiragana}\u30A1-\u30FA\u30FC-\u30FE\u3005\u3006\u30FB\u3000\u0020'\u2019.\-]$/u;
+
+const EMAIL_LOCAL_RE  = /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*$/;
+const EMAIL_LABEL_RE  = /^[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?$/u;
+const EMAIL_TLD_RE    = /^\p{L}{2,63}$/u;
+
+document.getElementById('re-email-local').textContent  = EMAIL_LOCAL_RE.source;
+document.getElementById('re-email-domain').textContent = EMAIL_LABEL_RE.source + '   (per label)';
+
+document.querySelectorAll('[data-namerule]').forEach(el => {
+  el.innerHTML =
+    '<b>Pattern</b> (JavaScript, <code>u</code> flag):' +
+    '<pre class="re"></pre>' +
+    '<b>Allowed</b> — Latin letters incl. accents · kanji (Han, incl. compatibility ideographs) · ' +
+    'hiragana · full-width katakana <code>U+30A1-U+30FA</code> · ' +
+    '<code>々 〆 ー ・ ヽ ヾ</code> · space and full-width space · ' +
+    '<code>&#39; ’ . -</code> · max 64 UTF-16 code units.<br><br>' +
+    '<b>Blocked</b> — digits (both widths) · emoji · half-width katakana ' +
+    '<code>U+FF61-U+FF9F</code> · <code>&lt; &gt; &amp; " $ % ! # ? § ; * ~ / \\ | ^ = [ ] { } ( )</code> · ' +
+    '<code>, : _ @ +</code> · other scripts · whitespace-only values · invisible characters.<br><br>' +
+    '<b>Normalization</b> — targeted only: full-width ASCII → half-width, U+3000 → space, ' +
+    'half-width katakana → full-width. Deliberately <b>not</b> full NFKC, which would rewrite ' +
+    '460 of the 512 CJK compatibility ideographs and silently alter registered surnames.';
+  el.querySelector('pre.re').textContent = NAME_RE.source;
+});
+
+/* ---------------------------------------------------------------
+   2. NORMALIZATION
+   --------------------------------------------------------------- */
+
+// Names: targeted transforms only. Never blanket NFKC — that would turn
+// 塚 (U+FA10) into 塚 (U+585A) and change a legally registered surname.
+function normalizeName(s) {
+  let out = s.replace(/[\uFF01-\uFF5E]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+  out = out.replace(/\u3000/g, ' ');
+  // NFKC applied ONLY to runs of half-width katakana, so dakuten compose
+  // correctly (ﾀ+ﾞ -> ダ) while every other codepoint is left untouched.
+  out = out.replace(/[\uFF61-\uFF9F]+/g, m => m.normalize('NFKC'));
+  return out.trim().replace(/ {2,}/g, ' ');
+}
+
+// Email: full NFKC is safe, the field holds no kanji.
+function normalizeEmail(s) {
+  return s.normalize('NFKC').trim().toLowerCase();
+}
+
+/* ---------------------------------------------------------------
+   3. HELPERS
+   --------------------------------------------------------------- */
+const U = cp => 'U+' + cp.toString(16).toUpperCase().padStart(4, '0');
+
+function invisibleName(cp) {
+  if (cp <= 0x1F || cp === 0x7F) return 'ASCII control';
+  if (cp === 0x00AD) return 'soft hyphen';
+  if (cp === 0x200B) return 'zero-width space';
+  if (cp === 0x200C) return 'zero-width non-joiner';
+  if (cp === 0x200D) return 'zero-width joiner';
+  if (cp === 0x2028) return 'line separator';
+  if (cp === 0x2029) return 'paragraph separator';
+  if (cp >= 0x202A && cp <= 0x202E) return 'bidi override';
+  if (cp >= 0x2066 && cp <= 0x2069) return 'bidi isolate';
+  if (cp === 0xFEFF) return 'byte-order mark';
+  return 'invisible';
+}
+
+// Why is this character not allowed in a name?
+function whyBlocked(ch) {
+  const cp = ch.codePointAt(0);
+  if (cp >= 0xFF61 && cp <= 0xFF9F) return 'half-width katakana';
+  if (cp >= 0xFF10 && cp <= 0xFF19) return 'full-width digit';
+  if (ch >= '0' && ch <= '9')       return 'digit';
+  try {
+    if (/\p{Extended_Pictographic}/u.test(ch)) return 'emoji / pictograph';
+    if (/\p{Script=Hangul}/u.test(ch))   return 'Hangul (Korean)';
+    if (/\p{Script=Cyrillic}/u.test(ch)) return 'Cyrillic';
+    if (/\p{Script=Arabic}/u.test(ch))   return 'Arabic';
+    if (/\p{Script=Thai}/u.test(ch))     return 'Thai';
+  } catch (e) { /* older engine: fall through */ }
+  if ("<>&\"$%!#?§;*~/\\|^=[]{}()".indexOf(ch) >= 0) return 'blocked punctuation (injection risk)';
+  if (",:_@+`".indexOf(ch) >= 0) return 'punctuation not permitted in names';
+  if (/\s/.test(ch)) return 'disallowed whitespace';
+  return 'outside the allowed character set';
+}
+
+function findInvisible(raw) {
+  INVISIBLE.lastIndex = 0;
+  const hits = [];
+  let m;
+  while ((m = INVISIBLE.exec(raw)) !== null) {
+    const cp = m[0].codePointAt(0);
+    hits.push({ index: m.index, cp: cp, label: invisibleName(cp) });
+  }
+  return hits;
+}
+
+/* ---------------------------------------------------------------
+   4. VALIDATORS  ->  { ok, msgs:[{kind,text}], normalized }
+   --------------------------------------------------------------- */
+
+function validateName(raw, fieldLabel) {
+  const msgs = [];
+  const push = (kind, text) => msgs.push({ kind, text });
+
+  if (raw === '') return { ok: false, empty: true, msgs: [], normalized: '' };
+
+  /* Step 1 — invisible characters */
+  const inv = findInvisible(raw);
+  if (inv.length) {
+    const detail = inv.map(h => `${h.label} (${U(h.cp)}) at position ${h.index + 1}`).join(', ');
+    push('err', `Contains ${inv.length} invisible character${inv.length > 1 ? 's' : ''}: ${detail}. ` +
+                `Unicode normalization never removes these, so they must be rejected outright.`);
+  }
+
+  /* Step 2 — normalization (reported, not an error) */
+  const norm = normalizeName(raw);
+  if (norm !== raw) {
+    push('note', `Normalized before validation: "${raw}" → "${norm}".`);
+  }
+
+  /* Informational — CJK compatibility ideographs deliberately preserved */
+  if (/[\uF900-\uFAFF]/.test(raw)) {
+    const full = raw.normalize('NFKC');
+    if (full !== raw) {
+      push('note', `Contains a CJK compatibility ideograph. Our targeted normalization preserves it. ` +
+                   `Full NFKC would have rewritten this to "${full}" — which is exactly why we do not use full NFKC on name fields.`);
+    } else {
+      push('note', `Contains a CJK compatibility ideograph that NFKC happens to leave alone ` +
+                   `(one of the 52 exceptions). Preserved either way.`);
+    }
+  }
+
+  /* Step 3 — whitespace-only */
+  if (norm === '' || /^[\u0020\u3000]+$/.test(norm)) {
+    push('err', `Value is empty or contains only spaces after trimming. A lone full-width space (U+3000) ` +
+                `is not removed by the server's String.trim(), so it is rejected by the pattern's leading lookahead.`);
+    return { ok: false, msgs, normalized: norm };
+  }
+
+  /* Step 4 — length, in UTF-16 code units */
+  const units = norm.length;
+  const points = Array.from(norm).length;
+  if (units > LIMIT.NAME_MAX) {
+    push('err', `Exceeds the maximum length of ${LIMIT.NAME_MAX}: this value is ${units} UTF-16 code units` +
+                (points !== units ? ` (${points} characters — surrogate-pair kanji count as 2 each)` : '') + '.');
+  } else if (points !== units) {
+    push('note', `Contains ${units - points} surrogate-pair character${units - points > 1 ? 's' : ''} ` +
+                 `(e.g. CJK Extension B). Counts as ${units} of the ${LIMIT.NAME_MAX} limit, not ${points}.`);
+  }
+
+  /* Step 5 — per-character diagnosis */
+  const offenders = new Map();
+  for (const ch of norm) {
+    if (INVISIBLE_ONE.test(ch)) continue;   // already reported precisely in step 1
+    if (!NAME_CHAR_RE.test(ch)) {
+      const why = whyBlocked(ch);
+      if (!offenders.has(why)) offenders.set(why, []);
+      const list = offenders.get(why);
+      if (list.length < 6 && !list.some(o => o.ch === ch)) list.push({ ch, cp: ch.codePointAt(0) });
+    }
+  }
+  for (const [why, list] of offenders) {
+    const shown = list.map(o => `"${o.ch}" ${U(o.cp)}`).join(', ');
+    let extra = '';
+    if (why === 'half-width katakana') {
+      extra = ' Normalization should have converted this to full-width — it reached validation, so the input path is bypassing step 2.';
+    } else if (why === 'digit' || why === 'full-width digit') {
+      extra = ' Digits are not name characters.';
+    }
+    push('err', `Not permitted \u2014 ${why}: ${shown}.${extra}`);
+  }
+
+  /* Step 6 — authoritative pattern test */
+  const ok = NAME_RE.test(norm);
+  if (!ok && !msgs.some(m => m.kind === 'err')) {
+    push('err', `Does not match the ${fieldLabel} pattern, and no single character could be isolated as the cause. Please report this input.`);
+  }
+  if (ok && !msgs.some(m => m.kind === 'err')) {
+    push('ok', `Valid. Stored value would be "${norm}" (${units} of ${LIMIT.NAME_MAX} code units).`);
+  }
+  return { ok: ok && !msgs.some(m => m.kind === 'err'), msgs, normalized: norm };
+}
+
+function validateEmail(raw) {
+  const msgs = [];
+  const push = (kind, text) => msgs.push({ kind, text });
+
+  if (raw === '') return { ok: false, empty: true, msgs: [], normalized: '' };
+
+  const inv = findInvisible(raw);
+  if (inv.length) {
+    const detail = inv.map(h => `${h.label} (${U(h.cp)}) at position ${h.index + 1}`).join(', ');
+    push('err', `Contains ${inv.length} invisible character${inv.length > 1 ? 's' : ''}: ${detail}.`);
+  }
+
+  const norm = normalizeEmail(raw);
+  if (norm !== raw) push('note', `Normalized before validation: "${raw}" → "${norm}".`);
+
+  if (norm.length > LIMIT.EMAIL_MAX) {
+    push('err', `Exceeds the maximum total length of ${LIMIT.EMAIL_MAX} characters (this value is ${norm.length}).`);
+  }
+
+  const at = norm.lastIndexOf('@');
+  if (at < 0) {
+    push('err', `Missing "@" — an email address needs a local part and a domain, for example taro@example.com.`);
+    return { ok: false, msgs, normalized: norm };
+  }
+
+  const local  = norm.slice(0, at);
+  const domain = norm.slice(at + 1);
+
+  /* ---- local part ---- */
+  if (local === '') {
+    push('err', `Missing the local part — there is nothing before the "@".`);
+  } else {
+    const nonAscii = [];
+    for (const ch of local) if (ch.codePointAt(0) > 127 && !nonAscii.some(o => o.ch === ch)) {
+      nonAscii.push({ ch, cp: ch.codePointAt(0) });
+    }
+    if (nonAscii.length) {
+      push('err', `The local part contains non-ASCII characters: ` +
+                  nonAscii.slice(0, 6).map(o => `"${o.ch}" ${U(o.cp)}`).join(', ') +
+                  `. Keycloak rejects these whenever SMTP is configured without allowutf8, which is our required setting.`);
+    }
+    if (local.length > LIMIT.EMAIL_LOCAL_MAX) {
+      push('err', `The local part is ${local.length} characters, exceeding the maximum of ${LIMIT.EMAIL_LOCAL_MAX}.`);
+    }
+    if (!nonAscii.length && !EMAIL_LOCAL_RE.test(local)) {
+      if (local.startsWith('.'))      push('err', `The local part must not begin with a dot.`);
+      else if (local.endsWith('.'))   push('err', `The local part must not end with a dot.`);
+      else if (local.includes('..'))  push('err', `The local part must not contain two consecutive dots.`);
+      else {
+        const bad = Array.from(local).filter(c => !/[A-Za-z0-9!#$%&'*+/=?^_`{|}~.-]/.test(c));
+        push('err', bad.length
+          ? `The local part contains characters that are not permitted: ` +
+            [...new Set(bad)].slice(0, 6).map(c => `"${c}" ${U(c.codePointAt(0))}`).join(', ') + '.'
+          : `The local part is not correctly formed.`);
+      }
+    }
+  }
+
+  /* ---- domain ---- */
+  if (domain === '') {
+    push('err', `Missing the domain — there is nothing after the "@".`);
+  } else if (domain.indexOf('.') < 0) {
+    push('err', `The domain "${domain}" has no top-level domain. Expected something like example.com.`);
+  } else if (domain.startsWith('.') || domain.endsWith('.')) {
+    push('err', `The domain must not begin or end with a dot.`);
+  } else if (domain.includes('..')) {
+    push('err', `The domain must not contain two consecutive dots.`);
+  } else {
+    const labels = domain.split('.');
+    let bad = false;
+    for (const lab of labels) {
+      if (!EMAIL_LABEL_RE.test(lab)) {
+        bad = true;
+        if (lab.startsWith('-') || lab.endsWith('-')) {
+          push('err', `The domain segment "${lab}" must not begin or end with a hyphen.`);
+        } else {
+          push('err', `The domain segment "${lab}" contains characters that are not permitted in a hostname.`);
+        }
+        break;
+      }
+    }
+    if (!bad && !EMAIL_TLD_RE.test(labels[labels.length - 1])) {
+      push('err', `The top-level domain "${labels[labels.length - 1]}" must be at least two letters and contain no digits or hyphens.`);
+    }
+    if (!bad && /[^\x00-\x7F]/.test(domain)) {
+      push('note', `Internationalised domain accepted. Keycloak converts it to punycode via IDN.toASCII before storage.`);
+    }
+  }
+
+  const ok = !msgs.some(m => m.kind === 'err');
+  if (ok) push('ok', `Valid. Stored value would be "${norm}".`);
+  return { ok, msgs, normalized: norm };
+}
+
+/* ---------------------------------------------------------------
+   5. PRESETS
+   --------------------------------------------------------------- */
+const ZWSP = '\u200B';
+const PRESETS = {
+  email: [
+    ['ok',   'Valid English',        'taro.yamada@example.com'],
+    ['ok',   'Sub-address',          'taro.yamada+dev@sub.example.co.jp'],
+    ['warn', 'IDN domain',           'taro@日本語.jp'],
+    ['warn', 'Full-width input',     'Ｔａｒｏ@ｅｘａｍｐｌｅ.ｃｏｍ'],
+    ['bad',  'Non-ASCII local part', '太郎@example.com'],
+    ['bad',  'Missing @',            'taro.example.com'],
+    ['bad',  'No TLD',               'taro@example'],
+    ['bad',  'Local part > 64',      'a'.repeat(65) + '@example.com'],
+    ['bad',  'Zero-width space',     'taro' + ZWSP + '@example.com']
+  ],
+  name: [
+    ['ok',   'Kanji',                { last: '山田',       first: '太郎' }],
+    ['ok',   'Kanji 々 mark',    { last: '佐々木', first: '一郎' }],
+    ['ok',   'Katakana',             { last: 'ヤマダ', first: 'タロウ' }],
+    ['ok',   'Hiragana',             { last: 'やまだ', first: 'たろう' }],
+    ['ok',   'English',              { last: 'Smith-Jones',        first: "O'Brien" }],
+    ['ok',   'Accented Latin',       { last: 'Müller',        first: 'José' }],
+    ['warn', 'Compat kanji (U+FA10)',{ last: '塚本',       first: '太郎' }],
+    ['warn', 'Compat kanji (U+FA11)',{ last: '山﨑',       first: '太郎' }],
+    ['warn', 'Surrogate kanji',      { last: '\u{20BB7}田',    first: '太郎' }],
+    ['warn', 'Full-width Latin',     { last: 'Ｓｍｉｔｈ', first: 'Ｊｏｈｎ' }],
+    ['warn', 'Half-width katakana',  { last: 'ﾔﾏﾀﾞ', first: 'ﾀﾛｳ' }],
+    ['warn', 'Full-width space',     { last: '山田　太郎', first: '太郎' }],
+    ['bad',  'Digits',               { last: '山田123',    first: '太郎' }],
+    ['bad',  'Full-width digits',    { last: '１２３', first: '太郎' }],
+    ['bad',  'Emoji',                { last: '😀',       first: '太郎' }],
+    ['bad',  'Markup',               { last: '山田<script>', first: '太郎' }],
+    ['bad',  'Underscore',           { last: 'taro_yamada',        first: '太郎' }],
+    ['bad',  'Space only',           { last: '　',             first: '太郎' }],
+    ['bad',  'Zero-width space',     { last: '山' + ZWSP + '田', first: '太郎' }],
+    ['bad',  'Korean (Hangul)',      { last: '김',             first: '太郎' }],
+    ['bad',  'Too long (65)',        { last: 'あ'.repeat(65),  first: '太郎' }]
+  ]
+};
+
+/* ---------------------------------------------------------------
+   6. RENDERING
+   --------------------------------------------------------------- */
+const FIELDS = {
+  email: { input: 'email', label: 'email',      fn: validateEmail },
+  last:  { input: 'last',  label: 'family name', fn: raw => validateName(raw, 'family name') },
+  first: { input: 'first', label: 'given name',  fn: raw => validateName(raw, 'given name') }
+};
+
+function render(key) {
+  const cfg   = FIELDS[key];
+  const input = document.getElementById(cfg.input);
+  const badge = document.getElementById(key + '-badge');
+  const list  = document.getElementById(key + '-msgs');
+  const res   = cfg.fn(input.value);
+
+  list.textContent = '';
+  input.classList.remove('pass', 'fail');
+  badge.textContent = '';
+
+  if (res.empty) {
+    const b = document.createElement('span');
+    b.className = 'badge idle';
+    b.textContent = 'AWAITING INPUT';
+    badge.appendChild(b);
+    return;
+  }
+
+  input.classList.add(res.ok ? 'pass' : 'fail');
+  const b = document.createElement('span');
+  b.className = 'badge ' + (res.ok ? 'pass' : 'fail');
+  b.textContent = res.ok ? 'PASSED' : 'FAILED';
+  badge.appendChild(b);
+
+  res.msgs.forEach(m => {
+    const li = document.createElement('li');
+    li.className = m.kind;
+    li.textContent = m.text;   // textContent, never innerHTML — input is untrusted
+    list.appendChild(li);
+  });
+
+  // Codepoint inspector whenever normalization altered the value or it failed
+  if (!res.ok || res.normalized !== input.value) {
+    const li = document.createElement('li');
+    li.className = 'note';
+    li.style.background = 'transparent';
+    li.style.borderColor = 'var(--line)';
+    li.style.color = 'var(--ink-soft)';
+    const d = document.createElement('details');
+    const s = document.createElement('summary');
+    s.textContent = 'Inspect codepoints';
+    s.style.cursor = 'pointer';
+    d.appendChild(s);
+    d.appendChild(codepointTable(input.value, res.normalized, key !== 'email'));
+    li.appendChild(d);
+    list.appendChild(li);
+  }
+}
+
+function codepointTable(raw, norm, isName) {
+  const t = document.createElement('table');
+  t.className = 'chars';
+  const head = document.createElement('tr');
+  ['#', 'Char', 'Codepoint', 'Verdict'].forEach(h => {
+    const th = document.createElement('th'); th.textContent = h; head.appendChild(th);
+  });
+  t.appendChild(head);
+
+  const chars = Array.from(norm);
+  chars.slice(0, 80).forEach((ch, i) => {
+    const tr = document.createElement('tr');
+    const cp = ch.codePointAt(0);
+    let verdict = 'allowed';
+    let bad = false;
+    if (isName) {
+      if (!NAME_CHAR_RE.test(ch)) { verdict = whyBlocked(ch); bad = true; }
+    } else {
+      if (cp > 127) { verdict = 'non-ASCII'; bad = false; }
+    }
+    const cells = [String(i + 1), ch === ' ' ? '␠' : ch, U(cp), verdict];
+    cells.forEach((v, ci) => {
+      const td = document.createElement('td');
+      td.textContent = v;
+      if (bad && ci === 3) td.className = 'bad';
+      tr.appendChild(td);
+    });
+    t.appendChild(tr);
+  });
+  if (chars.length > 80) {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = 4; td.textContent = '… ' + (chars.length - 80) + ' more';
+    tr.appendChild(td); t.appendChild(tr);
+  }
+  const cap = document.createElement('caption');
+  cap.style.cssText = 'caption-side:top;text-align:left;font-size:11.5px;padding:4px 0;color:var(--ink-faint)';
+  cap.textContent = raw === norm ? 'Value as entered (normalization made no change).'
+                                 : 'Value after normalization.';
+  t.insertBefore(cap, t.firstChild);
+  return t;
+}
+
+/* ---------------------------------------------------------------
+   7. WIRING
+   --------------------------------------------------------------- */
+Object.keys(FIELDS).forEach(key => {
+  const el = document.getElementById(FIELDS[key].input);
+  el.addEventListener('input', () => render(key));
+  el.addEventListener('blur',  () => render(key));
+  render(key);
+});
+
+document.querySelectorAll('[data-clear]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const key = btn.getAttribute('data-clear');
+    const el = document.getElementById(FIELDS[key].input);
+    el.value = ''; render(key); el.focus();
+  });
+});
+
+function buildQuick(container, items, apply) {
+  items.forEach(([kind, label, value]) => {
+    const b = document.createElement('button');
+    b.className = kind;
+    b.textContent = label;
+    b.title = typeof value === 'string' ? value : `姓 ${value.last} / 名 ${value.first}`;
+    b.addEventListener('click', () => apply(value));
+    container.appendChild(b);
+  });
+}
+
+buildQuick(document.querySelector('[data-for="email"]'), PRESETS.email, v => {
+  document.getElementById('email').value = v; render('email');
+});
+['last', 'first'].forEach(which => {
+  buildQuick(document.querySelector(`[data-for="${which}"]`), PRESETS.name, v => {
+    document.getElementById('last').value  = v.last;
+    document.getElementById('first').value = v.first;
+    render('last'); render('first');
+  });
+});
+
+/* ---------------------------------------------------------------
+   8. REGRESSION SUITE — fixtures straight from the specification
+   --------------------------------------------------------------- */
+const FIXTURES = [
+  // --- names: accept ---
+  ['name', '山田', true,  'kanji'],
+  ['name', '佐々木', true, 'iteration mark 々'],
+  ['name', '山﨑', true,  'compat kanji U+FA11 (NFKC exception)'],
+  ['name', '塚本', true,  'compat kanji U+FA10, must not be rewritten'],
+  ['name', 'Smith-Jones', true,   'hyphen'],
+  ['name', "O'Brien", true,       'apostrophe'],
+  ['name', 'やまだ', true, 'hiragana'],
+  ['name', 'ヴァイオレット', true, 'katakana + ヴ'],
+  ['name', 'Müller', true,   'accented Latin'],
+  ['name', '〇野'.replace('〇', '〆'), true, '〆'],
+  ['name', '\u{20BB7}田', true, 'surrogate-pair kanji'],
+  ['name', '山田　太郎', true, 'full-width space normalizes'],
+  ['name', 'Ｓｍｉｔｈ', true, 'full-width Latin normalizes'],
+  ['name', 'ﾔﾏﾀﾞ', true, 'half-width katakana normalizes'],
+  ['name', 'a'.repeat(64), true,  'exactly 64'],
+  // --- names: reject ---
+  ['name', '太郎123', false, 'digits'],
+  ['name', '１２３', false, 'full-width digits'],
+  ['name', '😀', false, 'emoji'],
+  ['name', '山田<script>', false, 'markup'],
+  ['name', '山田,', false, 'comma'],
+  ['name', 'taro_yamada', false, 'underscore'],
+  ['name', '', false, 'empty'],
+  ['name', ' ', false, 'space only'],
+  ['name', '　', false, 'full-width space only'],
+  ['name', '山' + ZWSP + '田', false, 'zero-width space'],
+  ['name', '김', false, 'Hangul'],
+  ['name', 'あ'.repeat(65), false, '65 characters'],
+  // --- email: accept ---
+  ['email', 'taro@example.com', true, 'basic'],
+  ['email', 'taro.yamada+dev@sub.example.co.jp', true, 'sub-address'],
+  ['email', 'taro@日本語.jp', true, 'IDN domain'],
+  ['email', 'Ｔａｒｏ@example.com', true, 'full-width local normalizes'],
+  ['email', 'a'.repeat(64) + '@example.com', true, 'local exactly 64'],
+  // --- email: reject ---
+  ['email', '太郎@example.com', false, 'non-ASCII local part'],
+  ['email', 'taro.example.com', false, 'missing @'],
+  ['email', 'taro@example', false, 'no TLD'],
+  ['email', 'a'.repeat(65) + '@example.com', false, 'local 65'],
+  ['email', '@example.com', false, 'empty local'],
+  ['email', 'taro@', false, 'empty domain'],
+  ['email', '.taro@example.com', false, 'leading dot'],
+  ['email', 'taro..yamada@example.com', false, 'double dot'],
+  ['email', 'taro@-example.com', false, 'label starts with hyphen'],
+  ['email', 'taro' + ZWSP + '@example.com', false, 'zero-width space'],
+  ['email', '', false, 'empty']
+];
+
+document.getElementById('runSuite').addEventListener('click', () => {
+  const out = document.getElementById('suiteOut');
+  out.textContent = '';
+  let pass = 0;
+  const rows = [];
+
+  FIXTURES.forEach(([type, value, expect, note]) => {
+    const r = type === 'email' ? validateEmail(value) : validateName(value, 'name');
+    const got = !!r.ok && !r.empty;
+    const good = got === expect;
+    if (good) pass++;
+    rows.push({ type, value, expect, got, good, note });
+  });
+
+  const tally = document.createElement('div');
+  tally.className = 'tally ' + (pass === FIXTURES.length ? 'good' : 'bad');
+  tally.textContent = `${pass} / ${FIXTURES.length} fixtures passed` +
+                      (pass === FIXTURES.length ? '  — implementation matches the specification.' : '  — see failures below.');
+  out.appendChild(tally);
+
+  const t = document.createElement('table');
+  const head = document.createElement('tr');
+  ['Field', 'Input', 'Expected', 'Actual', 'Case'].forEach(h => {
+    const th = document.createElement('th'); th.textContent = h; head.appendChild(th);
+  });
+  t.appendChild(head);
+
+  rows.filter(r => !r.good).concat(rows.filter(r => r.good)).forEach(r => {
+    const tr = document.createElement('tr');
+    if (!r.good) tr.className = 'f';
+    const shown = r.value === '' ? '(empty)'
+                : r.value.length > 40 ? r.value.slice(0, 37) + '…'
+                : r.value.replace(/\u200B/g, '␀');
+    [r.type, shown, r.expect ? 'accept' : 'reject', r.got ? 'accept' : 'reject', r.note]
+      .forEach((v, i) => {
+        const td = document.createElement('td');
+        td.textContent = v;
+        if (i === 1) td.className = 'v';
+        tr.appendChild(td);
+      });
+    t.appendChild(tr);
+  });
+  out.appendChild(t);
+});
+</script>
+</body>
+</html>
