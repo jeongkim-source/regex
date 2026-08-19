@@ -161,7 +161,7 @@
   <!-- ================= EMAIL ================= -->
   <section class="card" id="card-email">
     <h2>Email Address <span class="jp">メールアドレス</span></h2>
-    <p class="hint">Local part (before <code>@</code>) must be ASCII. Internationalised domains (<span class="swatch">日本語.jp</span>) are accepted — Keycloak converts them to punycode.</p>
+    <p class="hint">Local part (before <code>@</code>) must be ASCII. Internationalised domains (<span class="swatch">日本語.jp</span>) are accepted — Keycloak converts them to punycode. Full-width Latin (<span class="swatch">ｅｘａｍｐｌｅ</span>) is rejected everywhere in the address.</p>
     <div class="quick" data-for="email"></div>
     <div class="row">
       <input type="text" id="email" autocomplete="off" spellcheck="false" placeholder="taro@example.com">
@@ -176,7 +176,9 @@
         <pre class="re" id="re-email-local"></pre>
         <b>Domain</b> — dot-separated labels, letters/digits/hyphen, hyphen not at either end. Unicode letters allowed (IDN). TLD ≥ 2 letters.
         <pre class="re" id="re-email-domain"></pre>
-        <b>Normalization</b> — full NFKC, then trim, then lowercase. Safe here because the field holds no kanji.
+        <b>Normalization</b> — NFKC, then trim, then lowercase. Safe here because the field holds no kanji.
+        Full-width Latin letters <code>U+FF21-U+FF3A / U+FF41-U+FF5A</code> are excluded from the fold and
+        <b>rejected</b>, on both sides of the <code>@</code> — an address must be entered half-width.
       </div>
     </details>
   </section>
@@ -184,7 +186,7 @@
   <!-- ================= LAST NAME ================= -->
   <section class="card" id="card-last">
     <h2>Last Name (Family Name) <span class="jp">姓 / セイ</span></h2>
-    <p class="hint">Listed before the given name, matching Japanese order. Kanji, hiragana, full-width katakana and Latin are accepted.</p>
+    <p class="hint">Listed before the given name, matching Japanese order. Kanji, hiragana, full-width katakana and half-width (ASCII) Latin are accepted. Full-width Latin (<span class="swatch">Ｓｍｉｔｈ</span>) is rejected.</p>
     <div class="quick" data-for="last"></div>
     <div class="row">
       <input type="text" id="last" autocomplete="off" spellcheck="false" placeholder="山田">
@@ -247,12 +249,20 @@ const INVISIBLE_ONE = /[\u0000-\u001F\u007F\u00AD\u200B-\u200D\u2028\u2029\u202A
 // Person name: Latin + Han + Hiragana + full-width katakana + name punctuation.
 // Explicit katakana ranges are used instead of \p{Script=Katakana} because that
 // property also matches HALF-WIDTH katakana (U+FF61-FF9F), which must be blocked.
-// The leading lookahead rejects whitespace-only values: Java's String.trim()
+// The first lookahead rejects whitespace-only values: Java's String.trim()
 // does not strip U+3000, so length>=1 alone would let a blank name through.
-const NAME_RE = /^(?![ 　]+$)[\p{Script=Latin}\p{Script=Han}\p{Script=Hiragana}ァ-ヺー-ヾ々〆・　 '’.\-]{1,64}$/u;
+// The second rejects FULL-WIDTH Latin letters: U+FF21-FF3A / U+FF41-FF5A are
+// Script=Latin, so the class below would otherwise accept them. Latin must be
+// typed half-width, so they are excluded here instead of being width-folded.
+const NAME_RE = /^(?![ 　]+$)(?![\s\S]*[Ａ-Ｚａ-ｚ])[\p{Script=Latin}\p{Script=Han}\p{Script=Hiragana}ァ-ヺー-ヾ々〆・　 '’.\-]{1,64}$/u;
 
 // Single-character form of the class above, for per-character diagnostics.
-const NAME_CHAR_RE = /^[\p{Script=Latin}\p{Script=Han}\p{Script=Hiragana}\u30A1-\u30FA\u30FC-\u30FE\u3005\u3006\u30FB\u3000\u0020'\u2019.\-]$/u;
+const NAME_CHAR_RE = /^(?![Ａ-Ｚａ-ｚ])[\p{Script=Latin}\p{Script=Han}\p{Script=Hiragana}\u30A1-\u30FA\u30FC-\u30FE\u3005\u3006\u30FB\u3000\u0020'\u2019.\-]$/u;
+
+// Full-width Latin letters, U+FF21-FF3A and U+FF41-FF5A. Rejected in every
+// field, name and email alike: Latin must be typed half-width, so these are
+// never width-folded — the value is refused rather than silently rewritten.
+const FULLWIDTH_LATIN = /[Ａ-Ｚａ-ｚ]/;
 
 const EMAIL_LOCAL_RE  = /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*$/;
 const EMAIL_LABEL_RE  = /^[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?$/u;
@@ -270,10 +280,12 @@ document.querySelectorAll('[data-namerule]').forEach(el => {
     '<code>々 〆 ー ・ ヽ ヾ</code> · space and full-width space · ' +
     '<code>&#39; ’ . -</code> · max 64 UTF-16 code units.<br><br>' +
     '<b>Blocked</b> — digits (both widths) · emoji · half-width katakana ' +
-    '<code>U+FF61-U+FF9F</code> · <code>&lt; &gt; &amp; " $ % ! # ? § ; * ~ / \\ | ^ = [ ] { } ( )</code> · ' +
+    '<code>U+FF61-U+FF9F</code> · full-width Latin letters <code>U+FF21-U+FF3A / U+FF41-U+FF5A</code> ' +
+    '(Latin must be half-width) · <code>&lt; &gt; &amp; " $ % ! # ? § ; * ~ / \\ | ^ = [ ] { } ( )</code> · ' +
     '<code>, : _ @ +</code> · other scripts · whitespace-only values · invisible characters.<br><br>' +
-    '<b>Normalization</b> — targeted only: full-width ASCII → half-width, U+3000 → space, ' +
-    'half-width katakana → full-width. Deliberately <b>not</b> full NFKC, which would rewrite ' +
+    '<b>Normalization</b> — targeted only: full-width ASCII → half-width <i>except Latin letters</i>, U+3000 → space, ' +
+    'half-width katakana → full-width. Full-width Latin is <b>rejected, not folded</b>. ' +
+    'Deliberately <b>not</b> full NFKC, which would rewrite ' +
     '460 of the 512 CJK compatibility ideographs and silently alter registered surnames.';
   el.querySelector('pre.re').textContent = NAME_RE.source;
 });
@@ -285,7 +297,11 @@ document.querySelectorAll('[data-namerule]').forEach(el => {
 // Names: targeted transforms only. Never blanket NFKC — that would turn
 // 塚 (U+FA10) into 塚 (U+585A) and change a legally registered surname.
 function normalizeName(s) {
-  let out = s.replace(/[\uFF01-\uFF5E]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+  // Full-width ASCII -> half-width, EXCEPT the Latin letters (U+FF21-FF3A,
+  // U+FF41-FF5A): those are rejected, not silently repaired, so they must
+  // survive normalization and reach the pattern test intact.
+  let out = s.replace(/[\uFF01-\uFF20\uFF3B-\uFF40\uFF5B-\uFF5E]/g,
+                      c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
   out = out.replace(/\u3000/g, ' ');
   // NFKC applied ONLY to runs of half-width katakana, so dakuten compose
   // correctly (ﾀ+ﾞ -> ダ) while every other codepoint is left untouched.
@@ -293,9 +309,12 @@ function normalizeName(s) {
   return out.trim().replace(/ {2,}/g, ' ');
 }
 
-// Email: full NFKC is safe, the field holds no kanji.
+// Email: NFKC is safe here, the field holds no kanji — but it is applied to
+// everything EXCEPT full-width Latin letters. Folding those would repair the
+// address silently; they must survive to validation so they can be rejected.
+// Splitting on them is safe: they carry no combining marks of their own.
 function normalizeEmail(s) {
-  return s.normalize('NFKC').trim().toLowerCase();
+  return s.replace(/[^Ａ-Ｚａ-ｚ]+/g, m => m.normalize('NFKC')).trim().toLowerCase();
 }
 
 /* ---------------------------------------------------------------
@@ -322,6 +341,7 @@ function whyBlocked(ch) {
   const cp = ch.codePointAt(0);
   if (cp >= 0xFF61 && cp <= 0xFF9F) return 'half-width katakana';
   if (cp >= 0xFF10 && cp <= 0xFF19) return 'full-width digit';
+  if ((cp >= 0xFF21 && cp <= 0xFF3A) || (cp >= 0xFF41 && cp <= 0xFF5A)) return 'full-width Latin letter';
   if (ch >= '0' && ch <= '9')       return 'digit';
   try {
     if (/\p{Extended_Pictographic}/u.test(ch)) return 'emoji / pictograph';
@@ -419,6 +439,10 @@ function validateName(raw, fieldLabel) {
       extra = ' Normalization should have converted this to full-width — it reached validation, so the input path is bypassing step 2.';
     } else if (why === 'digit' || why === 'full-width digit') {
       extra = ' Digits are not name characters.';
+    } else if (why === 'full-width Latin letter') {
+      extra = ' Latin must be entered half-width (ASCII). These are deliberately not width-folded — ' +
+              'a name stored full-width breaks sorting, search and downstream matching, so the input is rejected ' +
+              'rather than silently rewritten.';
     }
     push('err', `Not permitted \u2014 ${why}: ${shown}.${extra}`);
   }
@@ -449,6 +473,21 @@ function validateEmail(raw) {
   const norm = normalizeEmail(raw);
   if (norm !== raw) push('note', `Normalized before validation: "${raw}" → "${norm}".`);
 
+  /* Full-width Latin — rejected on both sides of the "@", reported once */
+  const fwLatin = [];
+  for (const ch of norm) {
+    if (FULLWIDTH_LATIN.test(ch) && !fwLatin.some(o => o.ch === ch)) {
+      fwLatin.push({ ch, cp: ch.codePointAt(0) });
+    }
+  }
+  if (fwLatin.length) {
+    push('err', `Contains full-width Latin letters: ` +
+                fwLatin.slice(0, 6).map(o => `"${o.ch}" ${U(o.cp)}`).join(', ') +
+                `. An address must be typed half-width (ASCII). These are deliberately not ` +
+                `width-folded — a full-width address is a different string to every mail server ` +
+                `and lookup that sees it, so the input is rejected rather than silently rewritten.`);
+  }
+
   if (norm.length > LIMIT.EMAIL_MAX) {
     push('err', `Exceeds the maximum total length of ${LIMIT.EMAIL_MAX} characters (this value is ${norm.length}).`);
   }
@@ -467,7 +506,9 @@ function validateEmail(raw) {
     push('err', `Missing the local part — there is nothing before the "@".`);
   } else {
     const nonAscii = [];
-    for (const ch of local) if (ch.codePointAt(0) > 127 && !nonAscii.some(o => o.ch === ch)) {
+    // Full-width Latin is skipped here — it already has its own, more precise message.
+    for (const ch of local) if (ch.codePointAt(0) > 127 && !FULLWIDTH_LATIN.test(ch) &&
+                                !nonAscii.some(o => o.ch === ch)) {
       nonAscii.push({ ch, cp: ch.codePointAt(0) });
     }
     if (nonAscii.length) {
@@ -478,7 +519,7 @@ function validateEmail(raw) {
     if (local.length > LIMIT.EMAIL_LOCAL_MAX) {
       push('err', `The local part is ${local.length} characters, exceeding the maximum of ${LIMIT.EMAIL_LOCAL_MAX}.`);
     }
-    if (!nonAscii.length && !EMAIL_LOCAL_RE.test(local)) {
+    if (!nonAscii.length && !FULLWIDTH_LATIN.test(local) && !EMAIL_LOCAL_RE.test(local)) {
       if (local.startsWith('.'))      push('err', `The local part must not begin with a dot.`);
       else if (local.endsWith('.'))   push('err', `The local part must not end with a dot.`);
       else if (local.includes('..'))  push('err', `The local part must not contain two consecutive dots.`);
@@ -518,7 +559,7 @@ function validateEmail(raw) {
     if (!bad && !EMAIL_TLD_RE.test(labels[labels.length - 1])) {
       push('err', `The top-level domain "${labels[labels.length - 1]}" must be at least two letters and contain no digits or hyphens.`);
     }
-    if (!bad && /[^\x00-\x7F]/.test(domain)) {
+    if (!bad && !FULLWIDTH_LATIN.test(domain) && /[^\x00-\x7F]/.test(domain)) {
       push('note', `Internationalised domain accepted. Keycloak converts it to punycode via IDN.toASCII before storage.`);
     }
   }
@@ -537,7 +578,8 @@ const PRESETS = {
     ['ok',   'Valid English',        'taro.yamada@example.com'],
     ['ok',   'Sub-address',          'taro.yamada+dev@sub.example.co.jp'],
     ['warn', 'IDN domain',           'taro@日本語.jp'],
-    ['warn', 'Full-width input',     'Ｔａｒｏ@ｅｘａｍｐｌｅ.ｃｏｍ'],
+    ['bad',  'Full-width input',     'Ｔａｒｏ@ｅｘａｍｐｌｅ.ｃｏｍ'],
+    ['bad',  'Full-width domain',    'taro@ｅｘａｍｐｌｅ.com'],
     ['bad',  'Non-ASCII local part', '太郎@example.com'],
     ['bad',  'Missing @',            'taro.example.com'],
     ['bad',  'No TLD',               'taro@example'],
@@ -554,7 +596,7 @@ const PRESETS = {
     ['warn', 'Compat kanji (U+FA10)',{ last: '塚本',       first: '太郎' }],
     ['warn', 'Compat kanji (U+FA11)',{ last: '山﨑',       first: '太郎' }],
     ['warn', 'Surrogate kanji',      { last: '\u{20BB7}田',    first: '太郎' }],
-    ['warn', 'Full-width Latin',     { last: 'Ｓｍｉｔｈ', first: 'Ｊｏｈｎ' }],
+    ['bad',  'Full-width Latin',     { last: 'Ｓｍｉｔｈ', first: 'Ｊｏｈｎ' }],
     ['warn', 'Half-width katakana',  { last: 'ﾔﾏﾀﾞ', first: 'ﾀﾛｳ' }],
     ['warn', 'Full-width space',     { last: '山田　太郎', first: '太郎' }],
     ['bad',  'Digits',               { last: '山田123',    first: '太郎' }],
@@ -728,12 +770,13 @@ const FIXTURES = [
   ['name', '〇野'.replace('〇', '〆'), true, '〆'],
   ['name', '\u{20BB7}田', true, 'surrogate-pair kanji'],
   ['name', '山田　太郎', true, 'full-width space normalizes'],
-  ['name', 'Ｓｍｉｔｈ', true, 'full-width Latin normalizes'],
   ['name', 'ﾔﾏﾀﾞ', true, 'half-width katakana normalizes'],
   ['name', 'a'.repeat(64), true,  'exactly 64'],
   // --- names: reject ---
   ['name', '太郎123', false, 'digits'],
   ['name', '１２３', false, 'full-width digits'],
+  ['name', 'Ｓｍｉｔｈ', false, 'full-width Latin'],
+  ['name', '山田Ｔａｒｏ', false, 'full-width Latin mixed with kanji'],
   ['name', '😀', false, 'emoji'],
   ['name', '山田<script>', false, 'markup'],
   ['name', '山田,', false, 'comma'],
@@ -748,10 +791,12 @@ const FIXTURES = [
   ['email', 'taro@example.com', true, 'basic'],
   ['email', 'taro.yamada+dev@sub.example.co.jp', true, 'sub-address'],
   ['email', 'taro@日本語.jp', true, 'IDN domain'],
-  ['email', 'Ｔａｒｏ@example.com', true, 'full-width local normalizes'],
   ['email', 'a'.repeat(64) + '@example.com', true, 'local exactly 64'],
   // --- email: reject ---
   ['email', '太郎@example.com', false, 'non-ASCII local part'],
+  ['email', 'Ｔａｒｏ@example.com', false, 'full-width Latin local part'],
+  ['email', 'taro@ｅｘａｍｐｌｅ.com', false, 'full-width Latin domain label'],
+  ['email', 'taro@example.ｃｏｍ', false, 'full-width Latin TLD'],
   ['email', 'taro.example.com', false, 'missing @'],
   ['email', 'taro@example', false, 'no TLD'],
   ['email', 'a'.repeat(65) + '@example.com', false, 'local 65'],
