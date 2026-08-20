@@ -62,7 +62,7 @@
 
   .quick { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
   .quick button {
-    font: 500 12px/1 inherit; font-family: inherit;
+    font-family: inherit; font-size: 12px; font-weight: 500; line-height: 1;
     padding: 6px 10px; border-radius: 6px; cursor: pointer;
     border: 1px solid var(--line); background: var(--panel); color: var(--ink-soft);
     transition: .12s;
@@ -72,9 +72,24 @@
   .quick button.bad  { border-left: 3px solid var(--fail-line); }
   .quick button.warn { border-left: 3px solid var(--note-line); }
 
+  .subfield + .subfield {
+    margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--line);
+  }
+  .fieldlabel {
+    display: block; margin-bottom: 6px;
+    font-family: inherit; font-size: 12px; font-weight: 600; line-height: 1.4;
+    color: var(--ink-soft);
+  }
+  .fieldlabel .jp { font-weight: 500; color: var(--ink-faint); }
+  .fieldlabel .diff {
+    margin-left: 4px; padding: 1px 6px; border-radius: 4px; font-weight: 600;
+    background: var(--note-bg); border: 1px solid var(--note-line); color: var(--note-ink);
+  }
+
   .row { display: flex; gap: 10px; align-items: stretch; }
   input[type=text] {
-    flex: 1; min-width: 0; padding: 11px 13px; font: 15px/1.4 inherit; font-family: inherit;
+    flex: 1; min-width: 0; padding: 11px 13px;
+    font-family: inherit; font-size: 15px; line-height: 1.4;
     border: 1.5px solid var(--line); border-radius: 8px;
     background: var(--panel); color: var(--ink);
   }
@@ -133,7 +148,8 @@
   }
 
   #suite button {
-    font: 600 13px/1 inherit; font-family: inherit; padding: 9px 16px; border-radius: 7px;
+    font-family: inherit; font-size: 13px; font-weight: 600; line-height: 1;
+    padding: 9px 16px; border-radius: 7px;
     border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer;
   }
   #suite button:hover { filter: brightness(1.08); }
@@ -164,7 +180,9 @@
     <p class="hint">Local part (before <code>@</code>) must be ASCII. Internationalised domains (<span class="swatch">日本語.jp</span>) are accepted — Keycloak converts them to punycode. Wrong-width characters — full-width Latin (<span class="swatch">ｅｘａｍｐｌｅ</span>) and half-width katakana (<span class="swatch">ﾆﾎﾝ</span>) — are rejected everywhere in the address.</p>
     <div class="quick" data-for="email"></div>
     <div class="row">
-      <input type="text" id="email" autocomplete="off" spellcheck="false" placeholder="taro@example.com">
+      <!-- The h2 names this field; aria-label carries that name to the input itself,
+           which has no visible label of its own (the two name fields do). -->
+      <input type="text" id="email" aria-label="Email address" autocomplete="off" spellcheck="false" placeholder="taro@example.com">
       <button class="clear" data-clear="email" title="Clear">✕</button>
     </div>
     <div id="email-badge"></div>
@@ -184,34 +202,32 @@
     </details>
   </section>
 
-  <!-- ================= LAST NAME ================= -->
-  <section class="card" id="card-last">
-    <h2>Last Name (Family Name) <span class="jp">姓 / セイ</span></h2>
-    <p class="hint">Listed before the given name, matching Japanese order. Kanji, hiragana, full-width katakana and half-width (ASCII) Latin are accepted. Each script must be at its correct width: full-width Latin (<span class="swatch">Ｓｍｉｔｈ</span>) and half-width katakana (<span class="swatch">ﾔﾏﾀﾞ</span>) are both rejected.</p>
-    <div class="quick" data-for="last"></div>
-    <div class="row">
-      <input type="text" id="last" autocomplete="off" spellcheck="false" placeholder="山田">
-      <button class="clear" data-clear="last" title="Clear">✕</button>
-    </div>
-    <div id="last-badge"></div>
-    <ul class="msgs" id="last-msgs"></ul>
-    <details class="rule">
-      <summary>Active rule &amp; regex</summary>
-      <div class="rulebody" data-namerule></div>
-    </details>
-  </section>
+  <!-- ================= NAMES ================= -->
+  <section class="card" id="card-name">
+    <h2>Names <span class="jp">姓・名</span></h2>
+    <p class="hint">Both name fields share one character set, one normalization path and one length limit, so they are tested together here — a preset fills both boxes at once and you can compare the two verdicts. They differ in exactly one respect: <b>the family name may not contain a space</b>, while the given name may (<span class="swatch">太郎 二郎</span>). Kanji, hiragana, full-width katakana and half-width (ASCII) Latin are accepted, each at its correct width — full-width Latin (<span class="swatch">Ｓｍｉｔｈ</span>) and half-width katakana (<span class="swatch">ﾔﾏﾀﾞ</span>) are rejected in both.</p>
+    <div class="quick" data-for="name"></div>
 
-  <!-- ================= FIRST NAME ================= -->
-  <section class="card" id="card-first">
-    <h2>First Name (Given Name) <span class="jp">名 / メイ</span></h2>
-    <p class="hint">Same rule as the family name.</p>
-    <div class="quick" data-for="first"></div>
-    <div class="row">
-      <input type="text" id="first" autocomplete="off" spellcheck="false" placeholder="太郎">
-      <button class="clear" data-clear="first" title="Clear">✕</button>
+    <div class="subfield">
+      <label class="fieldlabel" for="family">Family name <span class="jp">姓 / セイ</span> <span class="diff">no space permitted</span></label>
+      <div class="row">
+        <input type="text" id="family" autocomplete="off" spellcheck="false" placeholder="山田">
+        <button class="clear" data-clear="family" title="Clear">✕</button>
+      </div>
+      <div id="family-badge"></div>
+      <ul class="msgs" id="family-msgs"></ul>
     </div>
-    <div id="first-badge"></div>
-    <ul class="msgs" id="first-msgs"></ul>
+
+    <div class="subfield">
+      <label class="fieldlabel" for="given">Given name <span class="jp">名 / メイ</span></label>
+      <div class="row">
+        <input type="text" id="given" autocomplete="off" spellcheck="false" placeholder="太郎">
+        <button class="clear" data-clear="given" title="Clear">✕</button>
+      </div>
+      <div id="given-badge"></div>
+      <ul class="msgs" id="given-msgs"></ul>
+    </div>
+
     <details class="rule">
       <summary>Active rule &amp; regex</summary>
       <div class="rulebody" data-namerule></div>
@@ -247,18 +263,42 @@ const INVISIBLE = /[\u0000-\u001F\u007F\u00AD\u200B-\u200D\u2028\u2029\u202A-\u2
 // Non-global twin: a /g regex carries lastIndex state and must not be reused for single tests.
 const INVISIBLE_ONE = /[\u0000-\u001F\u007F\u00AD\u200B-\u200D\u2028\u2029\u202A-\u202E\u2066-\u2069\uFEFF]/;
 
-// Person name: Latin + Han + Hiragana + full-width katakana + name punctuation.
-// Explicit katakana ranges are used instead of \p{Script=Katakana} because that
-// property also matches HALF-WIDTH katakana (U+FF61-FF9F), which must be blocked.
-// The first lookahead rejects whitespace-only values: Java's String.trim()
-// does not strip U+3000, so length>=1 alone would let a blank name through.
-// The second rejects FULL-WIDTH Latin letters: U+FF21-FF3A / U+FF41-FF5A are
-// Script=Latin, so the class below would otherwise accept them. Latin must be
-// typed half-width, so they are excluded here instead of being width-folded.
-const NAME_RE = /^(?![ 　]+$)(?![\s\S]*[Ａ-Ｚａ-ｚ])[\p{Script=Latin}\p{Script=Han}\p{Script=Hiragana}ァ-ヺー-ヾ々〆・　 '’.\-]{1,64}$/u;
+// ---- Person name -------------------------------------------------------
+// firstName and lastName carry the same rule apart from one difference: the
+// family name may not contain a space. Both are therefore built here from one
+// class, so the shared part can never drift between the two.
+//
+// Latin + Han + Hiragana + full-width katakana + name punctuation. Explicit
+// katakana ranges are used instead of \p{Script=Katakana} because that property
+// also matches HALF-WIDTH katakana (U+FF61-FF9F), which must be blocked.
+const NAME_CLASS  = "\\p{Script=Latin}\\p{Script=Han}\\p{Script=Hiragana}" +
+                    "\\u30A1-\\u30FA\\u30FC-\\u30FE\\u3005\\u3006\\u30FB" +
+                    "'\\u2019.\\-";
+// Space and U+3000, added to the class for the given name only.
+const SPACE_CLASS = "\\u0020\\u3000";
 
-// Single-character form of the class above, for per-character diagnostics.
-const NAME_CHAR_RE = /^(?![Ａ-Ｚａ-ｚ])[\p{Script=Latin}\p{Script=Han}\p{Script=Hiragana}\u30A1-\u30FA\u30FC-\u30FE\u3005\u3006\u30FB\u3000\u0020'\u2019.\-]$/u;
+// FULL-WIDTH Latin letters are excluded by lookahead rather than left out of
+// the class: U+FF21-FF3A / U+FF41-FF5A are Script=Latin, so \p{Script=Latin}
+// would otherwise accept them. Latin must be typed half-width.
+const NO_FW_LATIN = "(?![\\s\\S]*[\\uFF21-\\uFF3A\\uFF41-\\uFF5A])";
+// Rejects whitespace-only values: Java's String.trim() does not strip U+3000,
+// so length>=1 alone would let a blank name through. Only the given name needs
+// it — the family name has no space in its class at all.
+const NOT_BLANK   = "(?![\\u0020\\u3000]+$)";
+// Given name — space permitted between the elements of a compound given name.
+const NAME_RE = new RegExp(
+  `^${NOT_BLANK}${NO_FW_LATIN}[${NAME_CLASS}${SPACE_CLASS}]{1,64}$`, 'u');
+
+// Family name — identical, minus space and U+3000. A space in this field means
+// a full name was typed into one box, which stores "山田 太郎" as the surname
+// and then fails every later exact-match lookup on it.
+const NAME_RE_FAMILY = new RegExp(
+  `^${NO_FW_LATIN}[${NAME_CLASS}]{1,64}$`, 'u');
+
+// Single-character forms of the classes above, for per-character diagnostics.
+const NO_FW_LATIN_CHAR    = "(?![\\uFF21-\\uFF3A\\uFF41-\\uFF5A])";
+const NAME_CHAR_RE        = new RegExp(`^${NO_FW_LATIN_CHAR}[${NAME_CLASS}${SPACE_CLASS}]$`, 'u');
+const NAME_CHAR_RE_FAMILY = new RegExp(`^${NO_FW_LATIN_CHAR}[${NAME_CLASS}]$`, 'u');
 
 // Wrong-width characters, rejected in every field, name and email alike:
 // Latin must be typed half-width and katakana full-width. Neither is ever
@@ -276,23 +316,29 @@ document.getElementById('re-email-domain').textContent = EMAIL_LABEL_RE.source +
 
 document.querySelectorAll('[data-namerule]').forEach(el => {
   el.innerHTML =
-    '<b>Pattern</b> (JavaScript, <code>u</code> flag):' +
-    '<pre class="re"></pre>' +
+    '<b>Pattern</b> — given name (JavaScript, <code>u</code> flag):' +
+    '<pre class="re" data-re="given"></pre>' +
+    '<b>Pattern</b> — family name. The same pattern with space and <code>U+3000</code> removed ' +
+    'from the character class; both are generated from one class constant so the shared part ' +
+    'cannot drift. The whitespace-only lookahead is unnecessary here for the same reason.' +
+    '<pre class="re" data-re="family"></pre>' +
     '<b>Allowed</b> — half-width Latin letters incl. accents · kanji (Han, incl. compatibility ideographs) · ' +
     'hiragana · full-width katakana <code>U+30A1-U+30FA</code> only · ' +
-    '<code>々 〆 ー ・ ヽ ヾ</code> · space and full-width space · ' +
+    '<code>々 〆 ー ・ ヽ ヾ</code> · space and full-width space <b>in the given name only</b> · ' +
     '<code>&#39; ’ . -</code> · max 64 UTF-16 code units.<br><br>' +
     '<b>Blocked</b> — digits (both widths) · emoji · half-width katakana ' +
     '<code>U+FF61-U+FF9F</code> (katakana must be full-width) · full-width Latin letters ' +
     '<code>U+FF21-U+FF3A / U+FF41-U+FF5A</code> (Latin must be half-width) · <code>&lt; &gt; &amp; " $ % ! # ? § ; * ~ / \\ | ^ = [ ] { } ( )</code> · ' +
-    '<code>, : _ @ +</code> · other scripts · whitespace-only values · invisible characters.<br><br>' +
+    '<code>, : _ @ +</code> · other scripts · whitespace-only values · invisible characters · ' +
+    '<b>any space in the family name</b>.<br><br>' +
     '<b>Normalization</b> — targeted only: full-width ASCII → half-width <i>except Latin letters</i>, U+3000 → space, ' +
     'collapse repeated spaces, trim — ' +
     'and nothing else. Full-width Latin and half-width katakana are <b>rejected, not folded</b> — ' +
     'each must be entered at its correct width. No NFKC runs on this path at all, and full NFKC ' +
     'would in any case be wrong here: it rewrites ' +
     '460 of the 512 CJK compatibility ideographs and would silently alter registered surnames.';
-  el.querySelector('pre.re').textContent = NAME_RE.source;
+  el.querySelector('[data-re="given"]').textContent  = NAME_RE.source;
+  el.querySelector('[data-re="family"]').textContent = NAME_RE_FAMILY.source;
 });
 
 /* ---------------------------------------------------------------
@@ -378,7 +424,16 @@ function findInvisible(raw) {
    4. VALIDATORS  ->  { ok, msgs:[{kind,text}], normalized }
    --------------------------------------------------------------- */
 
-function validateName(raw, fieldLabel) {
+// One validator for both name attributes. `which` is 'family' or 'given' and
+// selects the pattern; everything before the pattern test — invisibles,
+// normalization, whitespace-only, length, per-character diagnosis — is shared,
+// because the two attributes differ only in whether a space is permitted.
+function validateName(raw, which) {
+  const isFamily = which === 'family';
+  const label    = isFamily ? 'family name' : 'given name';
+  const fullRe   = isFamily ? NAME_RE_FAMILY      : NAME_RE;
+  const charRe   = isFamily ? NAME_CHAR_RE_FAMILY : NAME_CHAR_RE;
+
   const msgs = [];
   const push = (kind, text) => msgs.push({ kind, text });
 
@@ -413,7 +468,9 @@ function validateName(raw, fieldLabel) {
   /* Step 3 — whitespace-only */
   if (norm === '' || /^[\u0020\u3000]+$/.test(norm)) {
     push('err', `Value is empty or contains only spaces after trimming. A lone full-width space (U+3000) ` +
-                `is not removed by the server's String.trim(), so it is rejected by the pattern's leading lookahead.`);
+                `is not removed by the server's String.trim(), so it is rejected` +
+                (isFamily ? ` — and the family name pattern has no space in its character class at all.`
+                          : ` by the pattern's leading lookahead.`));
     return { ok: false, msgs, normalized: norm };
   }
 
@@ -432,8 +489,9 @@ function validateName(raw, fieldLabel) {
   const offenders = new Map();
   for (const ch of norm) {
     if (INVISIBLE_ONE.test(ch)) continue;   // already reported precisely in step 1
-    if (!NAME_CHAR_RE.test(ch)) {
-      const why = whyBlocked(ch);
+    if (!charRe.test(ch)) {
+      // A space is a legal name character — it is only out of place here.
+      const why = (ch === ' ' || ch === '　') ? 'space in a family name' : whyBlocked(ch);
       if (!offenders.has(why)) offenders.set(why, []);
       const list = offenders.get(why);
       if (list.length < 6 && !list.some(o => o.ch === ch)) list.push({ ch, cp: ch.codePointAt(0) });
@@ -456,14 +514,19 @@ function validateName(raw, fieldLabel) {
       extra = ' Latin must be entered half-width (ASCII). These are deliberately not width-folded — ' +
               'a name stored full-width breaks sorting, search and downstream matching, so the input is rejected ' +
               'rather than silently rewritten.';
+    } else if (why === 'space in a family name') {
+      extra = ' The family name must be a single word. A space here almost always means a full name was ' +
+              'typed into one box, which would store the whole name as the surname and break every later ' +
+              'exact-match lookup on it. Put the given name in its own field. The given name itself may ' +
+              'contain a space.';
     }
     push('err', `Not permitted \u2014 ${why}: ${shown}.${extra}`);
   }
 
   /* Step 6 — authoritative pattern test */
-  const ok = NAME_RE.test(norm);
+  const ok = fullRe.test(norm);
   if (!ok && !msgs.some(m => m.kind === 'err')) {
-    push('err', `Does not match the ${fieldLabel} pattern, and no single character could be isolated as the cause. Please report this input.`);
+    push('err', `Does not match the ${label} pattern, and no single character could be isolated as the cause. Please report this input.`);
   }
   if (ok && !msgs.some(m => m.kind === 'err')) {
     push('ok', `Valid. Stored value would be "${norm}" (${units} of ${LIMIT.NAME_MAX} code units).`);
@@ -607,28 +670,32 @@ const PRESETS = {
     ['bad',  'Local part > 64',      'a'.repeat(65) + '@example.com'],
     ['bad',  'Zero-width space',     'taro' + ZWSP + '@example.com']
   ],
+  // One value per preset: it is loaded into BOTH name boxes, so a value that is
+  // legal in one field and not the other shows the difference side by side.
   name: [
-    ['ok',   'Kanji',                { last: '山田',       first: '太郎' }],
-    ['ok',   'Kanji 々 mark',    { last: '佐々木', first: '一郎' }],
-    ['ok',   'Katakana',             { last: 'ヤマダ', first: 'タロウ' }],
-    ['ok',   'Hiragana',             { last: 'やまだ', first: 'たろう' }],
-    ['ok',   'English',              { last: 'Smith-Jones',        first: "O'Brien" }],
-    ['ok',   'Accented Latin',       { last: 'Müller',        first: 'José' }],
-    ['warn', 'Compat kanji (U+FA10)',{ last: '塚本',       first: '太郎' }],
-    ['warn', 'Compat kanji (U+FA11)',{ last: '山﨑',       first: '太郎' }],
-    ['warn', 'Surrogate kanji',      { last: '\u{20BB7}田',    first: '太郎' }],
-    ['bad',  'Full-width Latin',     { last: 'Ｓｍｉｔｈ', first: 'Ｊｏｈｎ' }],
-    ['bad',  'Half-width katakana',  { last: 'ﾔﾏﾀﾞ', first: 'ﾀﾛｳ' }],
-    ['warn', 'Full-width space',     { last: '山田　太郎', first: '太郎' }],
-    ['bad',  'Digits',               { last: '山田123',    first: '太郎' }],
-    ['bad',  'Full-width digits',    { last: '１２３', first: '太郎' }],
-    ['bad',  'Emoji',                { last: '😀',       first: '太郎' }],
-    ['bad',  'Markup',               { last: '山田<script>', first: '太郎' }],
-    ['bad',  'Underscore',           { last: 'taro_yamada',        first: '太郎' }],
-    ['bad',  'Space only',           { last: '　',             first: '太郎' }],
-    ['bad',  'Zero-width space',     { last: '山' + ZWSP + '田', first: '太郎' }],
-    ['bad',  'Korean (Hangul)',      { last: '김',             first: '太郎' }],
-    ['bad',  'Too long (65)',        { last: 'あ'.repeat(65),  first: '太郎' }]
+    ['ok',   'Kanji',                 '山田'],
+    ['ok',   'Kanji 々 mark',          '佐々木'],
+    ['ok',   'Katakana',              'ヤマダ'],
+    ['ok',   'Hiragana',              'やまだ'],
+    ['ok',   'English',               'Smith-Jones'],
+    ['ok',   'Apostrophe',            "O'Brien"],
+    ['ok',   'Accented Latin',        'Müller'],
+    ['warn', 'Compat kanji (U+FA10)', '塚本'],
+    ['warn', 'Compat kanji (U+FA11)', '山﨑'],
+    ['warn', 'Surrogate kanji',       '\u{20BB7}田'],
+    ['warn', 'Space inside',          '山田 太郎'],
+    ['warn', 'Full-width space',      '山田　太郎'],
+    ['bad',  'Full-width Latin',      'Ｓｍｉｔｈ'],
+    ['bad',  'Half-width katakana',   'ﾔﾏﾀﾞ'],
+    ['bad',  'Digits',                '山田123'],
+    ['bad',  'Full-width digits',     '１２３'],
+    ['bad',  'Emoji',                 '😀'],
+    ['bad',  'Markup',                '山田<script>'],
+    ['bad',  'Underscore',            'taro_yamada'],
+    ['bad',  'Space only',            '　'],
+    ['bad',  'Zero-width space',      '山' + ZWSP + '田'],
+    ['bad',  'Korean (Hangul)',       '김'],
+    ['bad',  'Too long (65)',         'あ'.repeat(65)]
   ]
 };
 
@@ -636,10 +703,11 @@ const PRESETS = {
    6. RENDERING
    --------------------------------------------------------------- */
 const FIELDS = {
-  email: { input: 'email', label: 'email',      fn: validateEmail },
-  last:  { input: 'last',  label: 'family name', fn: raw => validateName(raw, 'family name') },
-  first: { input: 'first', label: 'given name',  fn: raw => validateName(raw, 'given name') }
+  email:  { input: 'email',  fn: validateEmail },
+  family: { input: 'family', fn: raw => validateName(raw, 'family') },
+  given:  { input: 'given',  fn: raw => validateName(raw, 'given') }
 };
+const NAME_KEYS = ['family', 'given'];
 
 function render(key) {
   const cfg   = FIELDS[key];
@@ -685,13 +753,17 @@ function render(key) {
     s.textContent = 'Inspect codepoints';
     s.style.cursor = 'pointer';
     d.appendChild(s);
-    d.appendChild(codepointTable(input.value, res.normalized, key !== 'email'));
+    d.appendChild(codepointTable(input.value, res.normalized, key));
     li.appendChild(d);
     list.appendChild(li);
   }
 }
 
-function codepointTable(raw, norm, isName) {
+function codepointTable(raw, norm, key) {
+  // Names are judged per character against their own class; email is not.
+  const charRe = key === 'family' ? NAME_CHAR_RE_FAMILY
+               : key === 'given'  ? NAME_CHAR_RE
+               : null;
   const t = document.createElement('table');
   t.className = 'chars';
   const head = document.createElement('tr');
@@ -706,8 +778,11 @@ function codepointTable(raw, norm, isName) {
     const cp = ch.codePointAt(0);
     let verdict = 'allowed';
     let bad = false;
-    if (isName) {
-      if (!NAME_CHAR_RE.test(ch)) { verdict = whyBlocked(ch); bad = true; }
+    if (charRe) {
+      if (!charRe.test(ch)) {
+        verdict = (ch === ' ' || ch === '　') ? 'space in a family name' : whyBlocked(ch);
+        bad = true;
+      }
     } else {
       if (cp > 127) { verdict = 'non-ASCII'; bad = false; }
     }
@@ -757,7 +832,7 @@ function buildQuick(container, items, apply) {
     const b = document.createElement('button');
     b.className = kind;
     b.textContent = label;
-    b.title = typeof value === 'string' ? value : `姓 ${value.last} / 名 ${value.first}`;
+    b.title = value;
     b.addEventListener('click', () => apply(value));
     container.appendChild(b);
   });
@@ -766,19 +841,24 @@ function buildQuick(container, items, apply) {
 buildQuick(document.querySelector('[data-for="email"]'), PRESETS.email, v => {
   document.getElementById('email').value = v; render('email');
 });
-['last', 'first'].forEach(which => {
-  buildQuick(document.querySelector(`[data-for="${which}"]`), PRESETS.name, v => {
-    document.getElementById('last').value  = v.last;
-    document.getElementById('first').value = v.first;
-    render('last'); render('first');
+// One preset row for both name boxes: the value goes into each, so the two
+// verdicts sit side by side and any family/given difference is visible at once.
+buildQuick(document.querySelector('[data-for="name"]'), PRESETS.name, v => {
+  NAME_KEYS.forEach(key => {
+    document.getElementById(FIELDS[key].input).value = v;
+    render(key);
   });
 });
 
 /* ---------------------------------------------------------------
    8. REGRESSION SUITE — fixtures straight from the specification
    --------------------------------------------------------------- */
+// Field column: 'name' means the case must give the same verdict for BOTH name
+// attributes — that is the shared part of the rule, and a fixture that came out
+// differently for family and given would be a drift bug. 'family' and 'given'
+// pin down the one place where they are meant to differ.
 const FIXTURES = [
-  // --- names: accept ---
+  // --- names, both attributes: accept ---
   ['name', '山田', true,  'kanji'],
   ['name', '佐々木', true, 'iteration mark 々'],
   ['name', '山﨑', true,  'compat kanji U+FA11 (NFKC exception)'],
@@ -790,9 +870,17 @@ const FIXTURES = [
   ['name', 'Müller', true,   'accented Latin'],
   ['name', '〇野'.replace('〇', '〆'), true, '〆'],
   ['name', '\u{20BB7}田', true, 'surrogate-pair kanji'],
-  ['name', '山田　太郎', true, 'full-width space normalizes'],
   ['name', 'a'.repeat(64), true,  'exactly 64'],
-  // --- names: reject ---
+  // --- names, the one difference: space ---
+  ['given',  '山田 太郎',   true,  'space permitted in a given name'],
+  ['family', '山田 太郎',   false, 'space rejected in a family name'],
+  ['given',  '山田　太郎',  true,  'full-width space normalizes, then permitted'],
+  ['family', '山田　太郎',  false, 'full-width space normalizes, then rejected'],
+  ['given',  'De La Cruz', true,  'spaced Latin given name'],
+  ['family', 'De La Cruz', false, 'spaced Latin family name'],
+  ['given',  '太郎 ',      true,  'trailing space is trimmed, not rejected'],
+  ['family', '太郎 ',      true,  'trailing space is trimmed before the pattern runs'],
+  // --- names, both attributes: reject ---
   ['name', '太郎123', false, 'digits'],
   ['name', '１２３', false, 'full-width digits'],
   ['name', 'Ｓｍｉｔｈ', false, 'full-width Latin'],
@@ -841,9 +929,20 @@ document.getElementById('runSuite').addEventListener('click', () => {
   let pass = 0;
   const rows = [];
 
+  const verdict = r => !!r.ok && !r.empty;
+
   FIXTURES.forEach(([type, value, expect, note]) => {
-    const r = type === 'email' ? validateEmail(value) : validateName(value, 'name');
-    const got = !!r.ok && !r.empty;
+    let got;
+    if (type === 'email') {
+      got = verdict(validateEmail(value));
+    } else if (type === 'name') {
+      // Shared rule: both attributes must agree, and agree with the fixture.
+      const f = verdict(validateName(value, 'family'));
+      const g = verdict(validateName(value, 'given'));
+      got = f === g ? f : (f ? 'family only' : 'given only');
+    } else {
+      got = verdict(validateName(value, type));   // 'family' | 'given'
+    }
     const good = got === expect;
     if (good) pass++;
     rows.push({ type, value, expect, got, good, note });
@@ -868,7 +967,10 @@ document.getElementById('runSuite').addEventListener('click', () => {
     const shown = r.value === '' ? '(empty)'
                 : r.value.length > 40 ? r.value.slice(0, 37) + '…'
                 : r.value.replace(/\u200B/g, '␀');
-    [r.type, shown, r.expect ? 'accept' : 'reject', r.got ? 'accept' : 'reject', r.note]
+    // A string verdict means the two name attributes disagreed on a shared case.
+    const actual = typeof r.got === 'string' ? `accept, ${r.got}`
+                 : r.got ? 'accept' : 'reject';
+    [r.type, shown, r.expect ? 'accept' : 'reject', actual, r.note]
       .forEach((v, i) => {
         const td = document.createElement('td');
         td.textContent = v;
