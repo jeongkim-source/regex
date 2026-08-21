@@ -237,6 +237,52 @@
       <div class="rulebody" data-namerule></div>
     </details>
   </section>
+
+  <!-- ================= FURIGANA ================= -->
+  <section class="card" id="card-kana">
+    <h2>Furigana <span class="jp">フリガナ — lastNameKana &amp; firstNameKana</span></h2>
+    <p class="hint">The reading of the name, stored as <code>lastNameKana</code> (セイ) and <code>firstNameKana</code> (メイ). Structurally identical to the name pair above — same normalization, same 64-unit limit, and again <b><code>lastNameKana</code> may not contain a space</b> while <code>firstNameKana</code> may. The character set is the difference: <b>full-width katakana only</b> (<span class="swatch">ヤマダ</span>), plus <span class="swatch">ー</span>, <span class="swatch">ヽ ヾ</span> and <span class="swatch">・</span> for foreign readings. Kanji (<span class="swatch">山田</span>), hiragana (<span class="swatch">やまだ</span>) and Latin (<span class="swatch">Yamada</span>) are rejected here even though the name fields accept them — and hiragana is not folded to katakana for you.</p>
+    <div class="quick" data-for="kana"></div>
+
+    <div class="subfield">
+      <label class="fieldlabel" for="lastNameKana"><span class="attr">lastNameKana</span> — family name reading <span class="jp">セイ</span> <span class="diff">no space permitted</span></label>
+      <div class="row">
+        <input type="text" id="lastNameKana" autocomplete="off" spellcheck="false" placeholder="ヤマダ">
+        <button class="clear" data-clear="lastNameKana" title="Clear">✕</button>
+      </div>
+      <div id="lastNameKana-badge"></div>
+      <ul class="msgs" id="lastNameKana-msgs"></ul>
+    </div>
+
+    <div class="subfield">
+      <label class="fieldlabel" for="firstNameKana"><span class="attr">firstNameKana</span> — given name reading <span class="jp">メイ</span> <span class="diff yes">space permitted</span></label>
+      <div class="row">
+        <input type="text" id="firstNameKana" autocomplete="off" spellcheck="false" placeholder="タロウ">
+        <button class="clear" data-clear="firstNameKana" title="Clear">✕</button>
+      </div>
+      <div id="firstNameKana-badge"></div>
+      <ul class="msgs" id="firstNameKana-msgs"></ul>
+    </div>
+
+    <details class="rule">
+      <summary>Active rule &amp; regex</summary>
+      <div class="rulebody" data-kanarule></div>
+    </details>
+  </section>
+
+  <!-- ================= SELF TEST ================= -->
+  <section class="card" id="suite">
+    <h2>Built-in regression suite</h2>
+    <p class="hint">Runs every fixture from the specification against the logic on this page. Use this to confirm the harness itself is behaving before you trust a manual result.</p>
+    <button id="runSuite">Run all fixtures</button>
+    <div id="suiteOut"></div>
+  </section>
+
+  <footer>
+    Server-side authority is Keycloak's User Profile config; this page mirrors it for review purposes.
+    The email check is a faithful approximation of Keycloak's built-in <code>email</code> validator, not a byte-identical copy —
+    report any input where you believe the two would disagree.
+  </footer>
 </div>
 
 <script>
@@ -291,6 +337,33 @@ const NO_FW_LATIN_CHAR    = "(?![\\uFF21-\\uFF3A\\uFF41-\\uFF5A])";
 const FIRSTNAME_CHAR_RE = new RegExp(`^${NO_FW_LATIN_CHAR}[${NAME_CLASS}${SPACE_CLASS}]$`, 'u');
 const LASTNAME_CHAR_RE  = new RegExp(`^${NO_FW_LATIN_CHAR}[${NAME_CLASS}]$`, 'u');
 
+// ---- Furigana ----------------------------------------------------------
+// The reading of the name, stored as lastNameKana / firstNameKana. Same shape
+// as the pair above — same normalization, same length limit, space permitted
+// in the given-name half only — but the character class is katakana and
+// nothing else: no kanji, no hiragana, no Latin, no digits.
+// U+30A1-U+30FA katakana · U+30FC-U+30FE ー ヽ ヾ · U+30FB ・ for foreign
+// readings such as スミス・ジョーンズ.
+const KANA_CLASS = "\\u30A1-\\u30FA\\u30FC-\\u30FE\\u30FB";
+
+// No full-width-Latin lookahead is needed on these two: the class admits no
+// Latin at all, so \p{Script=Latin} never gets a chance to match one.
+const FIRSTNAME_KANA_RE = new RegExp(`^${NOT_BLANK}[${KANA_CLASS}${SPACE_CLASS}]{1,64}$`, 'u');
+const LASTNAME_KANA_RE  = new RegExp(`^[${KANA_CLASS}]{1,64}$`, 'u');
+
+const FIRSTNAME_KANA_CHAR_RE = new RegExp(`^[${KANA_CLASS}${SPACE_CLASS}]$`, 'u');
+const LASTNAME_KANA_CHAR_RE  = new RegExp(`^[${KANA_CLASS}]$`, 'u');
+
+// The four name attributes, and the two ways they differ: whether a space is
+// permitted, and whether the value is a reading (katakana only) or the name
+// itself. Everything else about validating them is shared.
+const NAME_RULES = {
+  lastName:      { re: LASTNAME_RE,       charRe: LASTNAME_CHAR_RE,       space: false, kana: false, pair: 'firstName' },
+  firstName:     { re: FIRSTNAME_RE,      charRe: FIRSTNAME_CHAR_RE,      space: true,  kana: false, pair: 'lastName' },
+  lastNameKana:  { re: LASTNAME_KANA_RE,  charRe: LASTNAME_KANA_CHAR_RE,  space: false, kana: true,  pair: 'firstNameKana' },
+  firstNameKana: { re: FIRSTNAME_KANA_RE, charRe: FIRSTNAME_KANA_CHAR_RE, space: true,  kana: true,  pair: 'lastNameKana' }
+};
+
 // Wrong-width characters, rejected in every field, name and email alike:
 // Latin must be typed half-width and katakana full-width. Neither is ever
 // width-folded — the value is refused rather than silently rewritten.
@@ -330,6 +403,30 @@ document.querySelectorAll('[data-namerule]').forEach(el => {
     '460 of the 512 CJK compatibility ideographs and would silently alter registered surnames.';
   el.querySelector('[data-re="firstName"]').textContent = FIRSTNAME_RE.source;
   el.querySelector('[data-re="lastName"]').textContent  = LASTNAME_RE.source;
+});
+
+document.querySelectorAll('[data-kanarule]').forEach(el => {
+  el.innerHTML =
+    '<b>Pattern</b> — <code>firstNameKana</code> (JavaScript, <code>u</code> flag):' +
+    '<pre class="re" data-re="firstNameKana"></pre>' +
+    '<b>Pattern</b> — <code>lastNameKana</code>. The same pattern with space and <code>U+3000</code> ' +
+    'removed from the character class, exactly as with the name pair.' +
+    '<pre class="re" data-re="lastNameKana"></pre>' +
+    '<b>Allowed</b> — full-width katakana <code>U+30A1-U+30FA</code> · ' +
+    '<code>ー</code> <code>U+30FC</code> · <code>ヽ ヾ</code> · <code>・</code> <code>U+30FB</code> ' +
+    'for foreign readings · space and full-width space <b>in firstNameKana only</b> · ' +
+    'max 64 UTF-16 code units.<br><br>' +
+    '<b>Blocked</b> — everything else, including things a name field accepts: ' +
+    '<b>kanji</b> · <b>hiragana</b> · <b>Latin</b> · half-width katakana ' +
+    '<code>U+FF61-U+FF9F</code> · digits (both widths) · emoji · <code>&#39; ’ . -</code> · ' +
+    'other scripts · whitespace-only values · invisible characters · ' +
+    '<b>any space in lastNameKana</b>.<br><br>' +
+    '<b>Normalization</b> — the same path as the name fields, and for the same reasons: ' +
+    'full-width ASCII → half-width <i>except Latin letters</i>, U+3000 → space, collapse repeated ' +
+    'spaces, trim. Hiragana is <b>not</b> folded to katakana — a reading typed in the wrong kana is ' +
+    'rejected and sent back, not silently rewritten, on the same principle as the width rules.';
+  el.querySelector('[data-re="firstNameKana"]').textContent = FIRSTNAME_KANA_RE.source;
+  el.querySelector('[data-re="lastNameKana"]').textContent  = LASTNAME_KANA_RE.source;
 });
 
 /* ---------------------------------------------------------------
@@ -400,6 +497,19 @@ function whyBlocked(ch) {
   return 'outside the allowed character set';
 }
 
+// Why is this character not allowed in a FURIGANA field? These fields reject a
+// good deal that a name field accepts, so the generic reason ("outside the
+// allowed character set") would be unhelpful — say which script it is instead.
+function whyNotKana(ch) {
+  try {
+    if (/\p{Script=Hiragana}/u.test(ch)) return 'hiragana';
+    if (/\p{Script=Han}/u.test(ch))      return 'kanji';
+    // Full-width Latin and half-width katakana have their own, better messages.
+    if (/\p{Script=Latin}/u.test(ch) && !FULLWIDTH_LATIN.test(ch)) return 'Latin';
+  } catch (e) { /* older engine: fall through */ }
+  return whyBlocked(ch);
+}
+
 function findInvisible(raw) {
   INVISIBLE.lastIndex = 0;
   const hits = [];
@@ -415,15 +525,17 @@ function findInvisible(raw) {
    4. VALIDATORS  ->  { ok, msgs:[{kind,text}], normalized }
    --------------------------------------------------------------- */
 
-// One validator for both name attributes. `which` is 'lastName' or 'firstName'
-// and selects the pattern; everything before the pattern test — invisibles,
-// normalization, whitespace-only, length, per-character diagnosis — is shared,
-// because the two attributes differ only in whether a space is permitted.
+// One validator for all four name attributes — lastName, firstName and their
+// two kana readings. `which` names the attribute and selects its pattern from
+// NAME_RULES; everything before the pattern test — invisibles, normalization,
+// whitespace-only, length, per-character diagnosis — is shared, because the
+// attributes differ only in their character class.
 function validateName(raw, which) {
-  const isLast = which === 'lastName';
-  const label  = isLast ? 'lastName' : 'firstName';
-  const fullRe = isLast ? LASTNAME_RE      : FIRSTNAME_RE;
-  const charRe = isLast ? LASTNAME_CHAR_RE : FIRSTNAME_CHAR_RE;
+  const rule   = NAME_RULES[which];
+  const label  = which;
+  const fullRe = rule.re;
+  const charRe = rule.charRe;
+  const noSpace = !rule.space;
 
   const msgs = [];
   const push = (kind, text) => msgs.push({ kind, text });
@@ -460,8 +572,8 @@ function validateName(raw, which) {
   if (norm === '' || /^[\u0020\u3000]+$/.test(norm)) {
     push('err', `Value is empty or contains only spaces after trimming. A lone full-width space (U+3000) ` +
                 `is not removed by the server's String.trim(), so it is rejected` +
-                (isLast ? ` — and the lastName pattern has no space in its character class at all.`
-                        : ` by the pattern's leading lookahead.`));
+                (noSpace ? ` — and the ${label} pattern has no space in its character class at all.`
+                         : ` by the pattern's leading lookahead.`));
     return { ok: false, msgs, normalized: norm };
   }
 
@@ -481,8 +593,11 @@ function validateName(raw, which) {
   for (const ch of norm) {
     if (INVISIBLE_ONE.test(ch)) continue;   // already reported precisely in step 1
     if (!charRe.test(ch)) {
-      // A space is a legal name character — it is only out of place here.
-      const why = (ch === ' ' || ch === '　') ? 'space in lastName' : whyBlocked(ch);
+      // Characters that are legal elsewhere but out of place in THIS field get
+      // their own reason; anything universally rejected falls through.
+      const why = (ch === ' ' || ch === '　') ? `space in ${label}`
+                : rule.kana ? whyNotKana(ch)
+                : whyBlocked(ch);
       if (!offenders.has(why)) offenders.set(why, []);
       const list = offenders.get(why);
       if (list.length < 6 && !list.some(o => o.ch === ch)) list.push({ ch, cp: ch.codePointAt(0) });
@@ -505,11 +620,21 @@ function validateName(raw, which) {
       extra = ' Latin must be entered half-width (ASCII). These are deliberately not width-folded — ' +
               'a name stored full-width breaks sorting, search and downstream matching, so the input is rejected ' +
               'rather than silently rewritten.';
-    } else if (why === 'space in lastName') {
-      extra = ' lastName must be a single word. A space here almost always means a full name was typed ' +
+    } else if (why === `space in ${label}`) {
+      extra = ` ${label} must be a single word. A space here almost always means a full name was typed ` +
               'into one box, which would store the whole name as the surname and break every later ' +
-              'exact-match lookup on it. Put the given name in the firstName field, which does permit ' +
-              'a space.';
+              `exact-match lookup on it. Put the given name in the ${rule.pair} field, which does ` +
+              'permit a space.';
+    } else if (why === 'hiragana') {
+      extra = ' A furigana field holds the reading in full-width katakana. Hiragana is deliberately ' +
+              'not folded to katakana for you — on the same principle as the width rules, a reading ' +
+              'typed in the wrong kana is sent back rather than silently rewritten.';
+    } else if (why === 'kanji') {
+      extra = ` A furigana field holds the reading, not the name itself. The kanji belongs in the ` +
+              `${label.replace('Kana', '')} field; type its reading here in full-width katakana.`;
+    } else if (why === 'Latin') {
+      extra = ' A furigana field holds the reading in full-width katakana. A Latin-script name has ' +
+              'no kanji to gloss, so enter the katakana transcription — スミス for Smith.';
     }
     push('err', `Not permitted \u2014 ${why}: ${shown}.${extra}`);
   }
@@ -687,19 +812,40 @@ const PRESETS = {
     ['bad',  'Zero-width space',      '山' + ZWSP + '田'],
     ['bad',  'Korean (Hangul)',       '김'],
     ['bad',  'Too long (65)',         'あ'.repeat(65)]
+  ],
+  // Same idea for the readings: one value, loaded into both kana boxes.
+  kana: [
+    ['ok',   'Katakana',              'ヤマダ'],
+    ['ok',   'Long vowel ー',          'オードリー'],
+    ['ok',   'Voiced ヴ',              'ヴァイオレット'],
+    ['ok',   'Foreign reading ・',      'スミス・ジョーンズ'],
+    ['ok',   'Small kana',            'キャシャーン'],
+    ['warn', 'Space inside',          'ヤマダ タロウ'],
+    ['warn', 'Full-width space',      'ヤマダ　タロウ'],
+    ['bad',  'Hiragana',              'やまだ'],
+    ['bad',  'Kanji',                 '山田'],
+    ['bad',  'Latin',                 'Yamada'],
+    ['bad',  'Mixed kana + kanji',    'ヤマダ山田'],
+    ['bad',  'Half-width katakana',   'ﾔﾏﾀﾞ'],
+    ['bad',  'Full-width Latin',      'Ｙａｍａｄａ'],
+    ['bad',  'Digits',                'ヤマダ123'],
+    ['bad',  'Emoji',                 '😀'],
+    ['bad',  'Space only',            '　'],
+    ['bad',  'Zero-width space',      'ヤマ' + ZWSP + 'ダ'],
+    ['bad',  'Too long (65)',         'ア'.repeat(65)]
   ]
 };
 
 /* ---------------------------------------------------------------
    6. RENDERING
    --------------------------------------------------------------- */
-const FIELDS = {
-  email:     { input: 'email',     fn: validateEmail },
-  lastName:  { input: 'lastName',  fn: raw => validateName(raw, 'lastName') },
-  firstName: { input: 'firstName', fn: raw => validateName(raw, 'firstName') }
-};
-// Listed lastName first, matching Japanese order and the order on the page.
+const FIELDS = { email: { input: 'email', fn: validateEmail } };
+// Listed family-name-first, matching Japanese order and the order on the page.
 const NAME_KEYS = ['lastName', 'firstName'];
+const KANA_KEYS = ['lastNameKana', 'firstNameKana'];
+[...NAME_KEYS, ...KANA_KEYS].forEach(key => {
+  FIELDS[key] = { input: key, fn: raw => validateName(raw, key) };
+});
 
 function render(key) {
   const cfg   = FIELDS[key];
@@ -753,9 +899,8 @@ function render(key) {
 
 function codepointTable(raw, norm, key) {
   // Names are judged per character against their own class; email is not.
-  const charRe = key === 'lastName'  ? LASTNAME_CHAR_RE
-               : key === 'firstName' ? FIRSTNAME_CHAR_RE
-               : null;
+  const rule   = NAME_RULES[key];
+  const charRe = rule ? rule.charRe : null;
   const t = document.createElement('table');
   t.className = 'chars';
   const head = document.createElement('tr');
@@ -772,7 +917,9 @@ function codepointTable(raw, norm, key) {
     let bad = false;
     if (charRe) {
       if (!charRe.test(ch)) {
-        verdict = (ch === ' ' || ch === '　') ? 'space in lastName' : whyBlocked(ch);
+        verdict = (ch === ' ' || ch === '　') ? `space in ${key}`
+                : rule.kana ? whyNotKana(ch)
+                : whyBlocked(ch);
         bad = true;
       }
     } else {
@@ -833,22 +980,26 @@ function buildQuick(container, items, apply) {
 buildQuick(document.querySelector('[data-for="email"]'), PRESETS.email, v => {
   document.getElementById('email').value = v; render('email');
 });
-// One preset row for both name boxes: the value goes into each, so the two
-// verdicts sit side by side and any family/given difference is visible at once.
-buildQuick(document.querySelector('[data-for="name"]'), PRESETS.name, v => {
-  NAME_KEYS.forEach(key => {
-    document.getElementById(FIELDS[key].input).value = v;
-    render(key);
+// One preset row per card, feeding both of that card's boxes: the value goes
+// into each, so the two verdicts sit side by side and any lastName/firstName
+// difference is visible at once.
+[['name', PRESETS.name, NAME_KEYS], ['kana', PRESETS.kana, KANA_KEYS]].forEach(([slot, presets, keys]) => {
+  buildQuick(document.querySelector(`[data-for="${slot}"]`), presets, v => {
+    keys.forEach(key => {
+      document.getElementById(FIELDS[key].input).value = v;
+      render(key);
+    });
   });
 });
 
 /* ---------------------------------------------------------------
    8. REGRESSION SUITE — fixtures straight from the specification
    --------------------------------------------------------------- */
-// Field column: 'name' means the case must give the same verdict for BOTH name
-// attributes — that is the shared part of the rule, and a fixture that came out
-// differently for lastName and firstName would be a drift bug. 'lastName' and
-// 'firstName' pin down the one place where they are meant to differ.
+// Field column: 'name' and 'kana' mean the case must give the same verdict for
+// BOTH attributes of that pair — that is the shared part of the rule, and a
+// fixture that came out differently for the two halves would be a drift bug.
+// A named attribute ('lastName', 'firstNameKana', …) pins down the one place
+// where the two halves are meant to differ.
 const FIXTURES = [
   // --- names, both attributes: accept ---
   ['name', '山田', true,  'kanji'],
@@ -891,6 +1042,33 @@ const FIXTURES = [
   ['name', '山' + ZWSP + '田', false, 'zero-width space'],
   ['name', '김', false, 'Hangul'],
   ['name', 'あ'.repeat(65), false, '65 characters'],
+  // --- furigana, both attributes: accept ---
+  ['kana', 'ヤマダ', true, 'katakana'],
+  ['kana', 'オードリー', true, 'long vowel ー'],
+  ['kana', 'ヴァイオレット', true, 'katakana + ヴ'],
+  ['kana', 'スミス・ジョーンズ', true, '・ in a foreign reading'],
+  ['kana', 'ア'.repeat(64), true, 'exactly 64'],
+  // --- furigana, the one difference: space ---
+  ['firstNameKana', 'ヤマダ タロウ', true,  'space permitted in firstNameKana'],
+  ['lastNameKana',  'ヤマダ タロウ', false, 'space rejected in lastNameKana'],
+  ['firstNameKana', 'ヤマダ　タロウ', true,  'full-width space normalizes, then permitted'],
+  ['lastNameKana',  'ヤマダ　タロウ', false, 'full-width space normalizes, then rejected'],
+  // --- furigana, both attributes: reject ---
+  ['kana', 'やまだ', false, 'hiragana is not folded to katakana'],
+  ['kana', '山田', false, 'kanji'],
+  ['kana', 'ヤマダ山田', false, 'katakana mixed with kanji'],
+  ['kana', 'Yamada', false, 'Latin'],
+  ['kana', 'Ｙａｍａｄａ', false, 'full-width Latin'],
+  ['kana', 'ﾔﾏﾀﾞ', false, 'half-width katakana'],
+  ['kana', 'ヤマダ123', false, 'digits'],
+  ['kana', 'ヤマダ１２３', false, 'full-width digits'],
+  ['kana', '😀', false, 'emoji'],
+  ['kana', "オブライエン'", false, 'apostrophe, accepted by a name field'],
+  ['kana', 'スミス-ジョーンズ', false, 'hyphen, accepted by a name field'],
+  ['kana', '', false, 'empty'],
+  ['kana', '　', false, 'full-width space only'],
+  ['kana', 'ヤマ' + ZWSP + 'ダ', false, 'zero-width space'],
+  ['kana', 'ア'.repeat(65), false, '65 characters'],
   // --- email: accept ---
   ['email', 'taro@example.com', true, 'basic'],
   ['email', 'taro.yamada+dev@sub.example.co.jp', true, 'sub-address'],
@@ -922,18 +1100,22 @@ document.getElementById('runSuite').addEventListener('click', () => {
   const rows = [];
 
   const verdict = r => !!r.ok && !r.empty;
+  // Fixture types that stand for a pair of attributes rather than one.
+  const PAIRED = { name: NAME_KEYS, kana: KANA_KEYS };
 
   FIXTURES.forEach(([type, value, expect, note]) => {
     let got;
     if (type === 'email') {
       got = verdict(validateEmail(value));
-    } else if (type === 'name') {
-      // Shared rule: both attributes must agree, and agree with the fixture.
-      const l = verdict(validateName(value, 'lastName'));
-      const f = verdict(validateName(value, 'firstName'));
-      got = l === f ? l : (l ? 'lastName only' : 'firstName only');
+    } else if (PAIRED[type]) {
+      // Shared rule: both halves of the pair must agree, and agree with the
+      // fixture. A disagreement here would be a drift bug.
+      const [lastKey, firstKey] = PAIRED[type];
+      const l = verdict(validateName(value, lastKey));
+      const f = verdict(validateName(value, firstKey));
+      got = l === f ? l : (l ? `${lastKey} only` : `${firstKey} only`);
     } else {
-      got = verdict(validateName(value, type));   // 'lastName' | 'firstName'
+      got = verdict(validateName(value, type));   // one named attribute
     }
     const good = got === expect;
     if (good) pass++;
