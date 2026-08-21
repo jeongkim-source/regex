@@ -173,7 +173,7 @@
 <div class="wrap">
 
   <header class="page">
-    <h1>Keycloak Name &amp; Email Validation — SME Test Harness</h1>
+    <h1>Name &amp; Email Validation — SME Test Harness</h1>
     <p>Type or click a preset. Each field runs the full production pipeline: reject invisible characters → normalize width → trim → validate. The <b>Normalization</b> panel shows exactly what would be stored.</p>
     <div class="meta">Rules per keycloak-user-attribute-validation-rules.md · name max 64 · email max 255 / local max 64</div>
   </header>
@@ -209,7 +209,7 @@
   <!-- ================= NAMES ================= -->
   <section class="card" id="card-name">
     <h2>Names <span class="jp">姓・名 — lastName &amp; firstName</span></h2>
-    <p class="hint">The name is stored as two Keycloak attributes, <code>lastName</code> (family name, 姓) and <code>firstName</code> (given name, 名), listed in that order to match Japanese convention. They share one character set, one normalization path and one length limit, so they are tested together here — a preset fills both boxes at once and you can compare the two verdicts. They differ in exactly one respect: <b><code>lastName</code> may not contain a space</b>, while <code>firstName</code> may (<span class="swatch">太郎 二郎</span>). Kanji, hiragana, full-width katakana and half-width (ASCII) Latin are accepted, each at its correct width — full-width Latin (<span class="swatch">Ｓｍｉｔｈ</span>) and half-width katakana (<span class="swatch">ﾔﾏﾀﾞ</span>) are rejected in both.</p>
+    <p class="hint">The name is stored as two attributes, <code>lastName</code> (family name, 姓) and <code>firstName</code> (given name, 名), listed in that order to match Japanese convention. They share one character set, one normalization path and one length limit, so they are tested together here — a preset fills both boxes at once and you can compare the two verdicts. They differ in exactly one respect: <b><code>lastName</code> may not contain a space</b>, while <code>firstName</code> may (<span class="swatch">太郎 二郎</span>). Kanji, hiragana, full-width katakana and half-width (ASCII) Latin are accepted, each at its correct width — full-width Latin (<span class="swatch">Ｓｍｉｔｈ</span>) and half-width katakana (<span class="swatch">ﾔﾏﾀﾞ</span>) are rejected in both.</p>
     <div class="quick" data-for="name"></div>
 
     <div class="subfield">
@@ -237,20 +237,6 @@
       <div class="rulebody" data-namerule></div>
     </details>
   </section>
-
-  <!-- ================= SELF TEST ================= -->
-  <section class="card" id="suite">
-    <h2>Built-in regression suite</h2>
-    <p class="hint">Runs every fixture from the specification against the logic on this page. Use this to confirm the harness itself is behaving before you trust a manual result.</p>
-    <button id="runSuite">Run all fixtures</button>
-    <div id="suiteOut"></div>
-  </section>
-
-  <footer>
-    Server-side authority is Keycloak's User Profile config; this page mirrors it for review purposes.
-    The email check is a faithful approximation of Keycloak's built-in <code>email</code> validator, not a byte-identical copy —
-    report any input where you believe the two would disagree.
-  </footer>
 </div>
 
 <script>
