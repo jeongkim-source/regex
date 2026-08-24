@@ -166,7 +166,7 @@
   <!-- ================= EMAIL ================= -->
   <section class="card" id="card-email">
     <h2>Email Address <span class="jp">メールアドレス</span></h2>
-    <p class="hint">Local part (before <code>@</code>) must be ASCII. Internationalised domains (<span class="swatch">日本語.jp</span>) are accepted — Keycloak converts them to punycode. Wrong-width characters — full-width Latin (<span class="swatch">ｅｘａｍｐｌｅ</span>) and half-width katakana (<span class="swatch">ﾆﾎﾝ</span>) — are rejected everywhere in the address.</p>
+    <p class="hint">The whole address must be ASCII: the local part (before <code>@</code>) and the domain alike. Internationalised domains (<span class="swatch">日本語.jp</span>) are <b>rejected</b>, and so is their punycode form — <code>xn--</code> falls foul of the double-hyphen rule. Wrong-width characters — full-width Latin (<span class="swatch">ｅｘａｍｐｌｅ</span>) and half-width katakana (<span class="swatch">ﾆﾎﾝ</span>) — are rejected everywhere in the address.</p>
     <div class="quick" data-for="email"></div>
     <div class="row">
       <!-- The h2 names this field; aria-label carries that name to the input itself,
@@ -179,10 +179,10 @@
     <details class="rule">
       <summary>Active rule &amp; regex</summary>
       <div class="rulebody">
-        <b>Local part</b> — ASCII letters, digits and <code>! # $ % &amp; ' * + / = ? ^ _ ` { | } ~ -</code>, in dot-separated groups. Max 64.
-        <pre class="re" id="re-email-local"></pre>
-        <b>Domain</b> — dot-separated labels, letters/digits/hyphen, hyphen not at either end. Unicode letters allowed (IDN). TLD ≥ 2 letters.
-        <pre class="re" id="re-email-domain"></pre>
+        <b>Whole address</b> — one pattern, applied to the normalized value. Total length max 255.
+        <pre class="re" id="re-email"></pre>
+        <b>Local part</b> — ASCII letters, digits and <code>! # $ % &amp; ' * + / = ? ^ _ ` { | } ~ . -</code>, 1–64 characters. The address may not start with <code>% &amp; ' / ? ^ ` { | } ~ . -</code>, may not end the local part with <code>.</code> or <code>-</code>, and may contain no whitespace anywhere. <code>..</code> and <code>--</code> are refused; a dot beside a hyphen (<code>.-</code>) is not.
+        <b>Domain</b> — ASCII only: dot-separated labels of letters/digits/hyphen, 1–63 characters each, hyphen not at either end. TLD 2–63 letters, no digits. <code>--</code> is refused anywhere, which rules out punycode <code>xn--</code> labels as well.
         <b>Normalization</b> — NFKC, then trim, then lowercase. Safe here because the field holds no kanji.
         Full-width Latin <code>U+FF21-U+FF3A / U+FF41-U+FF5A</code> and half-width katakana
         <code>U+FF61-U+FF9F</code> are excluded from the fold and <b>rejected</b>, on both sides of the
@@ -333,12 +333,25 @@ const FULLWIDTH_LATIN    = /[Ａ-Ｚａ-ｚ]/;             // U+FF21-FF3A, U+FF4
 const HALFWIDTH_KATAKANA = /[｡-ﾟ]/;                    // U+FF61-FF9F, incl. ﾞ ﾟ
 const WRONG_WIDTH        = /[Ａ-Ｚａ-ｚ｡-ﾟ]/;           // either of the two above
 
-const EMAIL_LOCAL_RE  = /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*$/;
-const EMAIL_LABEL_RE  = /^[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?$/u;
-const EMAIL_TLD_RE    = /^\p{L}{2,63}$/u;
+// The email rule as one pattern — the authority for this field. Everything the
+// validator does below it is diagnostic: those checks exist to name WHICH part
+// of this an address broke, and no address is accepted that this does not match.
+// No /u flag: the pattern is pure ASCII now, so the flag would change nothing.
+const EMAIL_RE = /^(?![%&'/\?^`{|}~.-])(?!.*(?:\.\.|--))(?!.*[.-]@)(?!.*\s)[A-Za-z0-9!#$%&'*+/=?^_`{|}~.-]{1,64}@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$/;
 
-document.getElementById('re-email-local').textContent  = EMAIL_LOCAL_RE.source;
-document.getElementById('re-email-domain').textContent = EMAIL_LABEL_RE.source + '   (per label)';
+// The same rule taken apart, one piece per message. The local pattern drops the
+// {1,64} bound on purpose — length is counted and reported on its own, so
+// leaving it out here keeps an over-long address from being told off twice.
+const EMAIL_LEAD_BAN  = /^[%&'/?^`{|}~.-]/;   // the address may not start with one of these
+const EMAIL_LOCAL_RE  = /^(?![%&'/?^`{|}~.-])(?!.*(?:\.\.|--))(?!.*[.-]$)(?!.*\s)[A-Za-z0-9!#$%&'*+/=?^_`{|}~.-]+$/;
+const EMAIL_LABEL_RE  = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/;
+const EMAIL_TLD_RE    = /^[A-Za-z]{2,63}$/;
+// Only these two runs are refused. A dot beside a hyphen (".-", "-.") is not a
+// run under this rule — in the local part it passes; in the domain the label
+// pattern still rejects it, because no label may begin or end with a hyphen.
+const EMAIL_RUN_RE    = /\.\.|--/;
+
+document.getElementById('re-email').textContent = EMAIL_RE.source;
 
 document.querySelectorAll('[data-namerule]').forEach(el => {
   el.innerHTML =
@@ -625,6 +638,10 @@ function validateName(raw, which) {
   return { ok: ok && !msgs.some(m => m.kind === 'err'), msgs, normalized: norm };
 }
 
+// The first position bars these, and only these; every one of them is legal
+// further along the local part.
+const LEAD_BAN_TEXT = "% & ' / ? ^ ` { | } ~ . -";
+
 function validateEmail(raw) {
   const msgs = [];
   const push = (kind, text) => msgs.push({ kind, text });
@@ -658,7 +675,8 @@ function validateEmail(raw) {
   }
   if (hwKana.length) {
     push('err', `Contains half-width katakana: ${shownChars(hwKana)}. ` +
-                `Katakana must be typed full-width, and only in the domain — the local part is ASCII-only. ` +
+                `Katakana must be typed full-width everywhere it is accepted — though an address is not one of those places: ` +
+                `both sides of the "@" are ASCII-only under the current rule. ` +
                 `${widthTail}`);
   }
 
@@ -694,10 +712,17 @@ function validateEmail(raw) {
       push('err', `The local part is ${local.length} characters, exceeding the maximum of ${LIMIT.EMAIL_LOCAL_MAX}.`);
     }
     if (!nonAscii.length && !WRONG_WIDTH.test(local) && !EMAIL_LOCAL_RE.test(local)) {
-      if (local.startsWith('.'))      push('err', `The local part must not begin with a dot.`);
-      else if (local.endsWith('.'))   push('err', `The local part must not end with a dot.`);
-      else if (local.includes('..'))  push('err', `The local part must not contain two consecutive dots.`);
-      else {
+      if (EMAIL_LEAD_BAN.test(local)) {
+        push('err', `An address may not begin with "${local[0]}". The characters ` + LEAD_BAN_TEXT +
+                    ` are barred from the first position only — each one is permitted later in the local part.`);
+      }
+      else if (/[.-]$/.test(local))   push('err', `The local part must not end with a dot or a hyphen — neither may stand directly before the "@".`);
+      else if (EMAIL_RUN_RE.test(local)) {
+        push('err', `The local part contains "${local.match(EMAIL_RUN_RE)[0]}" — a doubled dot or a doubled hyphen is not permitted. A dot next to a hyphen (".-") is.`);
+      }
+      else if (/\s/.test(local)) {
+        push('err', `The local part contains whitespace. An address may not contain a space anywhere — surrounding whitespace is trimmed, whitespace inside the value is refused.`);
+      } else {
         const bad = Array.from(local).filter(c => !/[A-Za-z0-9!#$%&'*+/=?^_`{|}~.-]/.test(c));
         push('err', bad.length
           ? `The local part contains characters that are not permitted: ` +
@@ -710,12 +735,24 @@ function validateEmail(raw) {
   /* ---- domain ---- */
   if (domain === '') {
     push('err', `Missing the domain — there is nothing after the "@".`);
+  } else if (/\s/.test(domain)) {
+    push('err', `The domain contains whitespace. An address may not contain a space anywhere — surrounding whitespace is trimmed, whitespace inside the value is refused.`);
   } else if (domain.indexOf('.') < 0) {
     push('err', `The domain "${domain}" has no top-level domain. Expected something like example.com.`);
   } else if (domain.startsWith('.') || domain.endsWith('.')) {
     push('err', `The domain must not begin or end with a dot.`);
-  } else if (domain.includes('..')) {
-    push('err', `The domain must not contain two consecutive dots.`);
+  } else if (EMAIL_RUN_RE.test(domain)) {
+    push('err', `The domain contains "${domain.match(EMAIL_RUN_RE)[0]}" — a doubled dot or a doubled hyphen is not permitted, which rules out punycode labels ("xn--...") as well.`);
+  } else if (/[^\x00-\x7F]/.test(domain)) {
+    // Wrong-width characters already carry their own, more precise message; this
+    // branch still swallows them so the per-label checks below do not repeat it.
+    if (!WRONG_WIDTH.test(domain)) {
+      const foreign = [...new Set(Array.from(domain).filter(c => c.codePointAt(0) > 127))];
+      push('err', `The domain contains non-ASCII characters: ` +
+                  foreign.slice(0, 6).map(c => `"${c}" ${U(c.codePointAt(0))}`).join(', ') +
+                  `. The domain must be ASCII letters, digits and hyphens — an internationalised domain is not accepted in either form, ` +
+                  `since its punycode equivalent begins "xn--" and a doubled hyphen is refused.`);
+    }
   } else {
     const labels = domain.split('.');
     let bad = false;
@@ -724,6 +761,8 @@ function validateEmail(raw) {
         bad = true;
         if (lab.startsWith('-') || lab.endsWith('-')) {
           push('err', `The domain segment "${lab}" must not begin or end with a hyphen.`);
+        } else if (lab.length > 63) {
+          push('err', `The domain segment "${lab}" is ${lab.length} characters, exceeding the maximum of 63.`);
         } else {
           push('err', `The domain segment "${lab}" contains characters that are not permitted in a hostname.`);
         }
@@ -731,11 +770,16 @@ function validateEmail(raw) {
       }
     }
     if (!bad && !EMAIL_TLD_RE.test(labels[labels.length - 1])) {
-      push('err', `The top-level domain "${labels[labels.length - 1]}" must be at least two letters and contain no digits or hyphens.`);
+      push('err', `The top-level domain "${labels[labels.length - 1]}" must be 2 to 63 ASCII letters and contain no digits or hyphens.`);
     }
-    if (!bad && !WRONG_WIDTH.test(domain) && /[^\x00-\x7F]/.test(domain)) {
-      push('note', `Internationalised domain accepted. Keycloak converts it to punycode via IDN.toASCII before storage.`);
-    }
+  }
+
+  /* ---- the rule itself ----
+     Everything above only explains a failure; this decides one. An address that
+     reaches here without an error message is still refused if the pattern says
+     no, and that gap is a bug in the messages worth reporting. */
+  if (!msgs.some(m => m.kind === 'err') && !EMAIL_RE.test(norm)) {
+    push('err', `Does not match the address pattern, and no single part could be isolated as the cause. Please report this input.`);
   }
 
   const ok = !msgs.some(m => m.kind === 'err');
@@ -751,13 +795,22 @@ const PRESETS = {
   email: [
     ['ok',   'Valid English',        'taro.yamada@example.com'],
     ['ok',   'Sub-address',          'taro.yamada+dev@sub.example.co.jp'],
-    ['warn', 'IDN domain',           'taro@日本語.jp'],
+    ['ok',   'Leading +',            '+taro@example.com'],
+    ['warn', 'Dot beside hyphen',    'taro.-yamada@example.com'],
+    ['bad',  'IDN domain',           'taro@日本語.jp'],
     ['bad',  'Full-width input',     'Ｔａｒｏ@ｅｘａｍｐｌｅ.ｃｏｍ'],
     ['bad',  'Full-width domain',    'taro@ｅｘａｍｐｌｅ.com'],
     ['bad',  'Half-width kana domain', 'taro@ﾆﾎﾝ.jp'],
     ['bad',  'Non-ASCII local part', '太郎@example.com'],
     ['bad',  'Missing @',            'taro.example.com'],
     ['bad',  'No TLD',               'taro@example'],
+    ['bad',  'Leading dot',          '.taro@example.com'],
+    ['bad',  'Leading %',            '%taro@example.com'],
+    ['bad',  'Space inside',         'taro yamada@example.com'],
+    ['bad',  'Double dot in local',   'taro..yamada@example.com'],
+    ['bad',  'Dot before @',          'taro.@example.com'],
+    ['bad',  'Double hyphen domain',  'taro@ex--ample.com'],
+    ['bad',  'Digit in TLD',          'taro@example.c0m'],
     ['bad',  'Local part > 64',      'a'.repeat(65) + '@example.com'],
     ['bad',  'Zero-width space',     'taro' + ZWSP + '@example.com']
   ],
