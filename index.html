@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Keycloak Name &amp; Email Validation — SME Test Harness</title>
+<title>Name &amp; Email Validation — SME Test Harness</title>
 <style>
   :root {
     --bg: #f6f7f9;
@@ -151,21 +151,6 @@
     font-size: 12.5px; white-space: pre;
   }
 
-  #suite button {
-    font-family: inherit; font-size: 13px; font-weight: 600; line-height: 1;
-    padding: 9px 16px; border-radius: 7px;
-    border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer;
-  }
-  #suite button:hover { filter: brightness(1.08); }
-  #suiteOut { margin-top: 12px; font-size: 13px; }
-  #suiteOut table { border-collapse: collapse; width: 100%; font-size: 12px; margin-top: 9px; }
-  #suiteOut th, #suiteOut td { border: 1px solid var(--line); padding: 5px 8px; text-align: left; }
-  #suiteOut th { background: var(--code-bg); color: var(--ink-soft); }
-  #suiteOut td.v { font-family: var(--mono); }
-  #suiteOut tr.f td { background: var(--fail-bg); color: var(--fail-ink); }
-  .tally { font: 700 13px var(--mono); }
-  .tally.good { color: var(--pass-ink); }
-  .tally.bad  { color: var(--fail-ink); }
   footer { margin-top: 26px; font-size: 12px; color: var(--ink-faint); line-height: 1.7; }
 </style>
 </head>
@@ -175,7 +160,7 @@
   <header class="page">
     <h1>Name &amp; Email Validation — SME Test Harness</h1>
     <p>Type or click a preset. Each field runs the full production pipeline: reject invisible characters → normalize width → trim → validate. The <b>Normalization</b> panel shows exactly what would be stored.</p>
-    <div class="meta">Rules per keycloak-user-attribute-validation-rules.md · name max 64 · email max 255 / local max 64</div>
+    <div class="meta">Rules per keycloak-user-attribute-validation-rules.md · lastName / firstName max 120 · kana max 64 · email max 255 / local max 64</div>
   </header>
 
   <!-- ================= EMAIL ================= -->
@@ -208,28 +193,18 @@
 
   <!-- ================= NAMES ================= -->
   <section class="card" id="card-name">
-    <h2>Names <span class="jp">姓・名 — lastName &amp; firstName</span></h2>
-    <p class="hint">The name is stored as two attributes, <code>lastName</code> (family name, 姓) and <code>firstName</code> (given name, 名), listed in that order to match Japanese convention. They share one character set, one normalization path and one length limit, so they are tested together here — a preset fills both boxes at once and you can compare the two verdicts. They differ in exactly one respect: <b><code>lastName</code> may not contain a space</b>, while <code>firstName</code> may (<span class="swatch">太郎 二郎</span>). Kanji, hiragana, full-width katakana and half-width (ASCII) Latin are accepted, each at its correct width — full-width Latin (<span class="swatch">Ｓｍｉｔｈ</span>) and half-width katakana (<span class="swatch">ﾔﾏﾀﾞ</span>) are rejected in both.</p>
+    <h2>Name <span class="jp">氏名 — lastName &amp; firstName</span></h2>
+    <p class="hint">The name is stored as two Keycloak attributes, <code>lastName</code> (family name, 姓) and <code>firstName</code> (given name, 名), but <b>one rule governs both</b> — so a value tested here is tested for both. Taken verbatim from the User Profile config, that rule accepts kanji, hiragana, full-width katakana and Latin, a space (<span class="swatch">山田 太郎</span>), digits anywhere but the first position (<span class="swatch">太郎2</span>), and up to 120 characters. Because <code>\p{IsLatin}</code> covers them, full-width Latin (<span class="swatch">Ｓｍｉｔｈ</span>) is accepted too; half-width katakana (<span class="swatch">ﾔﾏﾀﾞ</span>) is not.</p>
     <div class="quick" data-for="name"></div>
 
     <div class="subfield">
-      <label class="fieldlabel" for="lastName"><span class="attr">lastName</span> — family name <span class="jp">姓 / セイ</span> <span class="diff">no space permitted</span></label>
+      <label class="fieldlabel" for="name"><span class="attr">lastName</span> / <span class="attr">firstName</span> <span class="jp">姓・名</span> <span class="diff yes">space · digits (not leading) · max 120</span></label>
       <div class="row">
-        <input type="text" id="lastName" autocomplete="off" spellcheck="false" placeholder="山田">
-        <button class="clear" data-clear="lastName" title="Clear">✕</button>
+        <input type="text" id="name" autocomplete="off" spellcheck="false" placeholder="山田">
+        <button class="clear" data-clear="name" title="Clear">✕</button>
       </div>
-      <div id="lastName-badge"></div>
-      <ul class="msgs" id="lastName-msgs"></ul>
-    </div>
-
-    <div class="subfield">
-      <label class="fieldlabel" for="firstName"><span class="attr">firstName</span> — given name <span class="jp">名 / メイ</span> <span class="diff yes">space permitted</span></label>
-      <div class="row">
-        <input type="text" id="firstName" autocomplete="off" spellcheck="false" placeholder="太郎">
-        <button class="clear" data-clear="firstName" title="Clear">✕</button>
-      </div>
-      <div id="firstName-badge"></div>
-      <ul class="msgs" id="firstName-msgs"></ul>
+      <div id="name-badge"></div>
+      <ul class="msgs" id="name-msgs"></ul>
     </div>
 
     <details class="rule">
@@ -270,8 +245,11 @@
     </details>
   </section>
 
-  <!-- ================= SELF TEST ================= -->
-
+  <footer>
+    Server-side authority is Keycloak's User Profile config; this page mirrors it for review purposes.
+    The email check is a faithful approximation of Keycloak's built-in <code>email</code> validator, not a byte-identical copy —
+    report any input where you believe the two would disagree.
+  </footer>
 </div>
 
 <script>
@@ -290,41 +268,37 @@ const INVISIBLE_ONE = /[\u0000-\u001F\u007F\u00AD\u200B-\u200D\u2028\u2029\u202A
 
 // ---- Person name -------------------------------------------------------
 // The name is stored as two attributes, lastName (family name) and firstName
-// (given name). They carry the same rule apart from one difference: lastName
-// may not contain a space. Both are therefore built here from one class, so
-// the shared part can never drift between the two.
+// (given name). ONE rule governs both, taken verbatim from the User Profile
+// config, so there is a single pattern here and a single box on the page.
 //
-// Latin + Han + Hiragana + full-width katakana + name punctuation. Explicit
-// katakana ranges are used instead of \p{Script=Katakana} because that property
-// also matches HALF-WIDTH katakana (U+FF61-FF9F), which must be blocked.
-const NAME_CLASS  = "\\p{Script=Latin}\\p{Script=Han}\\p{Script=Hiragana}" +
-                    "\\u30A1-\\u30FA\\u30FC-\\u30FE\\u3005\\u3006\\u30FB" +
-                    "'\\u2019.\\-";
-// Space and U+3000, added to the class for firstName only.
+// Written in Java, where the property is spelt \p{IsLatin}; the JS equivalent
+// is \p{Script=Latin}, and nothing else about it is translated:
+//
+//   ^(?![ 　]+$)(?![\p{N}])[\p{IsLatin}\p{IsHan}\p{IsHiragana}ァ-ヺー-ヾ々〆・　 '’.\-\p{N}]{1,120}$
+//
+// Worth knowing about what this admits:
+//   · space — 山田 太郎 is accepted, in either attribute;
+//   · digits are IN the class, so 太郎2 passes — but (?![\p{N}]) forbids one in
+//     first position, so 2太郎 does not;
+//   · \p{IsLatin} covers FULL-WIDTH Latin U+FF21-FF3A / U+FF41-FF5A, so
+//     Ｓｍｉｔｈ is accepted;
+//   · half-width katakana is out — U+FF61-FF9F is in none of the ranges;
+//   · the explicit katakana ranges ァ-ヺ ー-ヾ are used rather than
+//     \p{IsKatakana}, which would have dragged the half-width block back in.
+const NAME_SPEC_JAVA =
+  "^(?![ 　]+$)(?![\\p{N}])[\\p{IsLatin}\\p{IsHan}\\p{IsHiragana}ァ-ヺー-ヾ々〆・　 '’.\\-\\p{N}]{1,120}$";
+const NAME_RE =
+  /^(?![ 　]+$)(?![\p{N}])[\p{Script=Latin}\p{Script=Han}\p{Script=Hiragana}ァ-ヺー-ヾ々〆・　 '’.\-\p{N}]{1,120}$/u;
+
+// Single-character form of the class above — same members, no anchors. The
+// leading-digit rule is positional, so it cannot live here; it is checked
+// separately in validateName.
+const NAME_CHAR_RE =
+  /^[\p{Script=Latin}\p{Script=Han}\p{Script=Hiragana}ァ-ヺー-ヾ々〆・　 '’.\-\p{N}]$/u;
+
+// Still needed by the furigana pair below.
 const SPACE_CLASS = "\\u0020\\u3000";
-
-// FULL-WIDTH Latin letters are excluded by lookahead rather than left out of
-// the class: U+FF21-FF3A / U+FF41-FF5A are Script=Latin, so \p{Script=Latin}
-// would otherwise accept them. Latin must be typed half-width.
-const NO_FW_LATIN = "(?![\\s\\S]*[\\uFF21-\\uFF3A\\uFF41-\\uFF5A])";
-// Rejects whitespace-only values: Java's String.trim() does not strip U+3000,
-// so length>=1 alone would let a blank name through. Only firstName needs it —
-// lastName has no space in its class at all.
 const NOT_BLANK   = "(?![\\u0020\\u3000]+$)";
-// firstName — space permitted, e.g. between the elements of a compound given name.
-const FIRSTNAME_RE = new RegExp(
-  `^${NOT_BLANK}${NO_FW_LATIN}[${NAME_CLASS}${SPACE_CLASS}]{1,64}$`, 'u');
-
-// lastName — identical, minus space and U+3000. A space in this field means a
-// full name was typed into one box, which stores "山田 太郎" as the surname and
-// then fails every later exact-match lookup on it.
-const LASTNAME_RE = new RegExp(
-  `^${NO_FW_LATIN}[${NAME_CLASS}]{1,64}$`, 'u');
-
-// Single-character forms of the classes above, for per-character diagnostics.
-const NO_FW_LATIN_CHAR    = "(?![\\uFF21-\\uFF3A\\uFF41-\\uFF5A])";
-const FIRSTNAME_CHAR_RE = new RegExp(`^${NO_FW_LATIN_CHAR}[${NAME_CLASS}${SPACE_CLASS}]$`, 'u');
-const LASTNAME_CHAR_RE  = new RegExp(`^${NO_FW_LATIN_CHAR}[${NAME_CLASS}]$`, 'u');
 
 // ---- Furigana ----------------------------------------------------------
 // The reading of the name, stored as lastNameKana / firstNameKana. Same shape
@@ -343,12 +317,11 @@ const LASTNAME_KANA_RE  = new RegExp(`^[${KANA_CLASS}]{1,64}$`, 'u');
 const FIRSTNAME_KANA_CHAR_RE = new RegExp(`^[${KANA_CLASS}${SPACE_CLASS}]$`, 'u');
 const LASTNAME_KANA_CHAR_RE  = new RegExp(`^[${KANA_CLASS}]$`, 'u');
 
-// The four name attributes, and the two ways they differ: whether a space is
-// permitted, and whether the value is a reading (katakana only) or the name
-// itself. Everything else about validating them is shared.
+// The fields this page validates as names. `name` covers both lastName and
+// firstName, which share one rule; the two kana readings keep their own, where
+// the family half still forbids a space.
 const NAME_RULES = {
-  lastName:      { re: LASTNAME_RE,       charRe: LASTNAME_CHAR_RE,       space: false, kana: false, pair: 'firstName' },
-  firstName:     { re: FIRSTNAME_RE,      charRe: FIRSTNAME_CHAR_RE,      space: true,  kana: false, pair: 'lastName' },
+  name:          { re: NAME_RE,           charRe: NAME_CHAR_RE,           space: true,  kana: false, max: 120, noLeadingDigit: true },
   lastNameKana:  { re: LASTNAME_KANA_RE,  charRe: LASTNAME_KANA_CHAR_RE,  space: false, kana: true,  pair: 'firstNameKana' },
   firstNameKana: { re: FIRSTNAME_KANA_RE, charRe: FIRSTNAME_KANA_CHAR_RE, space: true,  kana: true,  pair: 'lastNameKana' }
 };
@@ -369,29 +342,33 @@ document.getElementById('re-email-domain').textContent = EMAIL_LABEL_RE.source +
 
 document.querySelectorAll('[data-namerule]').forEach(el => {
   el.innerHTML =
-    '<b>Pattern</b> — <code>firstName</code> (JavaScript, <code>u</code> flag):' +
-    '<pre class="re" data-re="firstName"></pre>' +
-    '<b>Pattern</b> — <code>lastName</code>. The same pattern with space and <code>U+3000</code> removed ' +
-    'from the character class; both are generated from one class constant so the shared part ' +
-    'cannot drift. The whitespace-only lookahead is unnecessary here for the same reason.' +
-    '<pre class="re" data-re="lastName"></pre>' +
-    '<b>Allowed</b> — half-width Latin letters incl. accents · kanji (Han, incl. compatibility ideographs) · ' +
-    'hiragana · full-width katakana <code>U+30A1-U+30FA</code> only · ' +
-    '<code>々 〆 ー ・ ヽ ヾ</code> · space and full-width space <b>in firstName only</b> · ' +
-    '<code>&#39; ’ . -</code> · max 64 UTF-16 code units.<br><br>' +
-    '<b>Blocked</b> — digits (both widths) · emoji · half-width katakana ' +
-    '<code>U+FF61-U+FF9F</code> (katakana must be full-width) · full-width Latin letters ' +
-    '<code>U+FF21-U+FF3A / U+FF41-U+FF5A</code> (Latin must be half-width) · <code>&lt; &gt; &amp; " $ % ! # ? § ; * ~ / \\ | ^ = [ ] { } ( )</code> · ' +
-    '<code>, : _ @ +</code> · other scripts · whitespace-only values · invisible characters · ' +
-    '<b>any space in lastName</b>.<br><br>' +
-    '<b>Normalization</b> — targeted only: full-width ASCII → half-width <i>except Latin letters</i>, U+3000 → space, ' +
-    'collapse repeated spaces, trim — ' +
-    'and nothing else. Full-width Latin and half-width katakana are <b>rejected, not folded</b> — ' +
-    'each must be entered at its correct width. No NFKC runs on this path at all, and full NFKC ' +
-    'would in any case be wrong here: it rewrites ' +
-    '460 of the 512 CJK compatibility ideographs and would silently alter registered surnames.';
-  el.querySelector('[data-re="firstName"]').textContent = FIRSTNAME_RE.source;
-  el.querySelector('[data-re="lastName"]').textContent  = LASTNAME_RE.source;
+    'One pattern governs both <code>lastName</code> and <code>firstName</code>. ' +
+    'As written in the User Profile config (Java):' +
+    '<pre class="re" data-re="nameJava"></pre>' +
+    'and as run on this page (JavaScript, <code>u</code> flag). Only the property spelling ' +
+    'differs — Java\'s <code>\\p{IsLatin}</code> is <code>\\p{Script=Latin}</code> in JS:' +
+    '<pre class="re" data-re="name"></pre>' +
+    '<b>Allowed</b> — Latin letters incl. accents <b>and full-width Latin</b> ' +
+    '<code>U+FF21-U+FF3A / U+FF41-U+FF5A</code>, which <code>\\p{IsLatin}</code> covers · ' +
+    'kanji (Han, incl. compatibility ideographs) · hiragana · full-width katakana ' +
+    '<code>U+30A1-U+30FA</code> · <code>々 〆 ー ・ ヽ ヾ</code> · space and full-width space · ' +
+    '<code>&#39; ’ . -</code> · digits <code>\\p{N}</code> anywhere but first · ' +
+    'max 120 UTF-16 code units.<br><br>' +
+    '<b>Blocked</b> — a <b>leading digit</b>, by the <code>(?![\\p{N}])</code> lookahead · ' +
+    'half-width katakana <code>U+FF61-U+FF9F</code>, which is in none of the ranges — note the ' +
+    'explicit <code>ァ-ヺ ー-ヾ</code> rather than <code>\\p{IsKatakana}</code>, which would have ' +
+    'dragged that block back in · emoji · ' +
+    '<code>&lt; &gt; &amp; " $ % ! # ? § ; * ~ / \\ | ^ = [ ] { } ( )</code> · ' +
+    '<code>, : _ @ +</code> · other scripts · whitespace-only values · invisible characters.<br><br>' +
+    '<b>Normalization</b> — targeted only: full-width ASCII → half-width <i>except Latin letters</i>, ' +
+    'U+3000 → space, collapse repeated spaces, trim — and nothing else. Half-width katakana is ' +
+    '<b>rejected, not folded</b>. No NFKC runs on this path at all, and full NFKC would in any case ' +
+    'be wrong here: it rewrites 460 of the 512 CJK compatibility ideographs and would silently alter ' +
+    'registered surnames.<br><br>' +
+    'The fold runs <i>before</i> the pattern, so a full-width digit arrives as an ASCII digit: ' +
+    '<code>１２３</code> is rejected as a leading digit, not as a full-width one.';
+  el.querySelector('[data-re="nameJava"]').textContent = NAME_SPEC_JAVA;
+  el.querySelector('[data-re="name"]').textContent     = NAME_RE.source;
 });
 
 document.querySelectorAll('[data-kanarule]').forEach(el => {
@@ -525,6 +502,7 @@ function validateName(raw, which) {
   const fullRe = rule.re;
   const charRe = rule.charRe;
   const noSpace = !rule.space;
+  const max     = rule.max || LIMIT.NAME_MAX;
 
   const msgs = [];
   const push = (kind, text) => msgs.push({ kind, text });
@@ -569,12 +547,20 @@ function validateName(raw, which) {
   /* Step 4 — length, in UTF-16 code units */
   const units = norm.length;
   const points = Array.from(norm).length;
-  if (units > LIMIT.NAME_MAX) {
-    push('err', `Exceeds the maximum length of ${LIMIT.NAME_MAX}: this value is ${units} UTF-16 code units` +
+  if (units > max) {
+    push('err', `Exceeds the maximum length of ${max} for ${label}: this value is ${units} UTF-16 code units` +
                 (points !== units ? ` (${points} characters — surrogate-pair kanji count as 2 each)` : '') + '.');
   } else if (points !== units) {
     push('note', `Contains ${units - points} surrogate-pair character${units - points > 1 ? 's' : ''} ` +
-                 `(e.g. CJK Extension B). Counts as ${units} of the ${LIMIT.NAME_MAX} limit, not ${points}.`);
+                 `(e.g. CJK Extension B). Counts as ${units} of the ${max} limit, not ${points}.`);
+  }
+
+  /* Step 4b — leading digit. Positional, so no single character is at fault
+     and step 5 cannot report it: the digit is a member of the class. */
+  if (rule.noLeadingDigit && /^\p{N}/u.test(norm)) {
+    push('err', `Must not begin with a digit: "${Array.from(norm)[0]}" ${U(norm.codePointAt(0))}. ` +
+                `Digits are permitted inside ${label} — 太郎2 is accepted — but the pattern's ` +
+                `(?![\\p{N}]) lookahead rejects one in first position.`);
   }
 
   /* Step 5 — per-character diagnosis */
@@ -634,7 +620,7 @@ function validateName(raw, which) {
     push('err', `Does not match the ${label} pattern, and no single character could be isolated as the cause. Please report this input.`);
   }
   if (ok && !msgs.some(m => m.kind === 'err')) {
-    push('ok', `Valid. Stored value would be "${norm}" (${units} of ${LIMIT.NAME_MAX} code units).`);
+    push('ok', `Valid. Stored value would be "${norm}" (${units} of ${max} code units).`);
   }
   return { ok: ok && !msgs.some(m => m.kind === 'err'), msgs, normalized: norm };
 }
@@ -790,9 +776,9 @@ const PRESETS = {
     ['warn', 'Surrogate kanji',       '\u{20BB7}田'],
     ['warn', 'Space inside',          '山田 太郎'],
     ['warn', 'Full-width space',      '山田　太郎'],
-    ['bad',  'Full-width Latin',      'Ｓｍｉｔｈ'],
+    ['warn', 'Full-width Latin',      'Ｓｍｉｔｈ'],
     ['bad',  'Half-width katakana',   'ﾔﾏﾀﾞ'],
-    ['bad',  'Digits',                '山田123'],
+    ['warn', 'Digits',                '山田123'],
     ['bad',  'Full-width digits',     '１２３'],
     ['bad',  'Emoji',                 '😀'],
     ['bad',  'Markup',                '山田<script>'],
@@ -800,7 +786,7 @@ const PRESETS = {
     ['bad',  'Space only',            '　'],
     ['bad',  'Zero-width space',      '山' + ZWSP + '田'],
     ['bad',  'Korean (Hangul)',       '김'],
-    ['bad',  'Too long (65)',         'あ'.repeat(65)]
+    ['warn', 'Too long (65)',         'あ'.repeat(65)]
   ],
   // Same idea for the readings: one value, loaded into both kana boxes.
   kana: [
@@ -829,8 +815,9 @@ const PRESETS = {
    6. RENDERING
    --------------------------------------------------------------- */
 const FIELDS = { email: { input: 'email', fn: validateEmail } };
-// Listed family-name-first, matching Japanese order and the order on the page.
-const NAME_KEYS = ['lastName', 'firstName'];
+// One box for the name, two for the readings — listed family-name-first there,
+// matching Japanese order and the order on the page.
+const NAME_KEYS = ['name'];
 const KANA_KEYS = ['lastNameKana', 'firstNameKana'];
 [...NAME_KEYS, ...KANA_KEYS].forEach(key => {
   FIELDS[key] = { input: key, fn: raw => validateName(raw, key) };
@@ -979,170 +966,6 @@ buildQuick(document.querySelector('[data-for="email"]'), PRESETS.email, v => {
       render(key);
     });
   });
-});
-
-/* ---------------------------------------------------------------
-   8. REGRESSION SUITE — fixtures straight from the specification
-   --------------------------------------------------------------- */
-// Field column: 'name' and 'kana' mean the case must give the same verdict for
-// BOTH attributes of that pair — that is the shared part of the rule, and a
-// fixture that came out differently for the two halves would be a drift bug.
-// A named attribute ('lastName', 'firstNameKana', …) pins down the one place
-// where the two halves are meant to differ.
-const FIXTURES = [
-  // --- names, both attributes: accept ---
-  ['name', '山田', true,  'kanji'],
-  ['name', '佐々木', true, 'iteration mark 々'],
-  ['name', '山﨑', true,  'compat kanji U+FA11 (NFKC exception)'],
-  ['name', '塚本', true,  'compat kanji U+FA10, must not be rewritten'],
-  ['name', 'Smith-Jones', true,   'hyphen'],
-  ['name', "O'Brien", true,       'apostrophe'],
-  ['name', 'やまだ', true, 'hiragana'],
-  ['name', 'ヴァイオレット', true, 'katakana + ヴ'],
-  ['name', 'Müller', true,   'accented Latin'],
-  ['name', '〇野'.replace('〇', '〆'), true, '〆'],
-  ['name', '\u{20BB7}田', true, 'surrogate-pair kanji'],
-  ['name', 'a'.repeat(64), true,  'exactly 64'],
-  // --- names, the one difference: space ---
-  ['firstName', '山田 太郎',   true,  'space permitted in firstName'],
-  ['lastName',  '山田 太郎',   false, 'space rejected in lastName'],
-  ['firstName', '山田　太郎',  true,  'full-width space normalizes, then permitted'],
-  ['lastName',  '山田　太郎',  false, 'full-width space normalizes, then rejected'],
-  ['firstName', 'De La Cruz', true,  'spaced Latin firstName'],
-  ['lastName',  'De La Cruz', false, 'spaced Latin lastName'],
-  ['firstName', '太郎 ',      true,  'trailing space is trimmed, not rejected'],
-  ['lastName',  '太郎 ',      true,  'trailing space is trimmed before the pattern runs'],
-  // --- names, both attributes: reject ---
-  ['name', '太郎123', false, 'digits'],
-  ['name', '１２３', false, 'full-width digits'],
-  ['name', 'Ｓｍｉｔｈ', false, 'full-width Latin'],
-  ['name', '山田Ｔａｒｏ', false, 'full-width Latin mixed with kanji'],
-  ['name', 'ﾔﾏﾀﾞ', false, 'half-width katakana'],
-  ['name', 'ﾀﾛｳ', false, 'half-width katakana, unvoiced'],
-  ['name', '山田ﾀﾛｳ', false, 'half-width katakana mixed with kanji'],
-  ['name', '｡', false, 'half-width ideographic full stop'],
-  ['name', '😀', false, 'emoji'],
-  ['name', '山田<script>', false, 'markup'],
-  ['name', '山田,', false, 'comma'],
-  ['name', 'taro_yamada', false, 'underscore'],
-  ['name', '', false, 'empty'],
-  ['name', ' ', false, 'space only'],
-  ['name', '　', false, 'full-width space only'],
-  ['name', '山' + ZWSP + '田', false, 'zero-width space'],
-  ['name', '김', false, 'Hangul'],
-  ['name', 'あ'.repeat(65), false, '65 characters'],
-  // --- furigana, both attributes: accept ---
-  ['kana', 'ヤマダ', true, 'katakana'],
-  ['kana', 'オードリー', true, 'long vowel ー'],
-  ['kana', 'ヴァイオレット', true, 'katakana + ヴ'],
-  ['kana', 'スミス・ジョーンズ', true, '・ in a foreign reading'],
-  ['kana', 'ア'.repeat(64), true, 'exactly 64'],
-  // --- furigana, the one difference: space ---
-  ['firstNameKana', 'ヤマダ タロウ', true,  'space permitted in firstNameKana'],
-  ['lastNameKana',  'ヤマダ タロウ', false, 'space rejected in lastNameKana'],
-  ['firstNameKana', 'ヤマダ　タロウ', true,  'full-width space normalizes, then permitted'],
-  ['lastNameKana',  'ヤマダ　タロウ', false, 'full-width space normalizes, then rejected'],
-  // --- furigana, both attributes: reject ---
-  ['kana', 'やまだ', false, 'hiragana is not folded to katakana'],
-  ['kana', '山田', false, 'kanji'],
-  ['kana', 'ヤマダ山田', false, 'katakana mixed with kanji'],
-  ['kana', 'Yamada', false, 'Latin'],
-  ['kana', 'Ｙａｍａｄａ', false, 'full-width Latin'],
-  ['kana', 'ﾔﾏﾀﾞ', false, 'half-width katakana'],
-  ['kana', 'ヤマダ123', false, 'digits'],
-  ['kana', 'ヤマダ１２３', false, 'full-width digits'],
-  ['kana', '😀', false, 'emoji'],
-  ['kana', "オブライエン'", false, 'apostrophe, accepted by a name field'],
-  ['kana', 'スミス-ジョーンズ', false, 'hyphen, accepted by a name field'],
-  ['kana', '', false, 'empty'],
-  ['kana', '　', false, 'full-width space only'],
-  ['kana', 'ヤマ' + ZWSP + 'ダ', false, 'zero-width space'],
-  ['kana', 'ア'.repeat(65), false, '65 characters'],
-  // --- email: accept ---
-  ['email', 'taro@example.com', true, 'basic'],
-  ['email', 'taro.yamada+dev@sub.example.co.jp', true, 'sub-address'],
-  ['email', 'taro@日本語.jp', true, 'IDN domain'],
-  ['email', 'a'.repeat(64) + '@example.com', true, 'local exactly 64'],
-  // --- email: reject ---
-  ['email', '太郎@example.com', false, 'non-ASCII local part'],
-  ['email', 'Ｔａｒｏ@example.com', false, 'full-width Latin local part'],
-  ['email', 'taro@ｅｘａｍｐｌｅ.com', false, 'full-width Latin domain label'],
-  ['email', 'taro@example.ｃｏｍ', false, 'full-width Latin TLD'],
-  ['email', 'taro@ﾆﾎﾝ.jp', false, 'half-width katakana domain label'],
-  ['email', 'ﾀﾛｳ@example.com', false, 'half-width katakana local part'],
-  ['email', 'taro.example.com', false, 'missing @'],
-  ['email', 'taro@example', false, 'no TLD'],
-  ['email', 'a'.repeat(65) + '@example.com', false, 'local 65'],
-  ['email', '@example.com', false, 'empty local'],
-  ['email', 'taro@', false, 'empty domain'],
-  ['email', '.taro@example.com', false, 'leading dot'],
-  ['email', 'taro..yamada@example.com', false, 'double dot'],
-  ['email', 'taro@-example.com', false, 'label starts with hyphen'],
-  ['email', 'taro' + ZWSP + '@example.com', false, 'zero-width space'],
-  ['email', '', false, 'empty']
-];
-
-document.getElementById('runSuite').addEventListener('click', () => {
-  const out = document.getElementById('suiteOut');
-  out.textContent = '';
-  let pass = 0;
-  const rows = [];
-
-  const verdict = r => !!r.ok && !r.empty;
-  // Fixture types that stand for a pair of attributes rather than one.
-  const PAIRED = { name: NAME_KEYS, kana: KANA_KEYS };
-
-  FIXTURES.forEach(([type, value, expect, note]) => {
-    let got;
-    if (type === 'email') {
-      got = verdict(validateEmail(value));
-    } else if (PAIRED[type]) {
-      // Shared rule: both halves of the pair must agree, and agree with the
-      // fixture. A disagreement here would be a drift bug.
-      const [lastKey, firstKey] = PAIRED[type];
-      const l = verdict(validateName(value, lastKey));
-      const f = verdict(validateName(value, firstKey));
-      got = l === f ? l : (l ? `${lastKey} only` : `${firstKey} only`);
-    } else {
-      got = verdict(validateName(value, type));   // one named attribute
-    }
-    const good = got === expect;
-    if (good) pass++;
-    rows.push({ type, value, expect, got, good, note });
-  });
-
-  const tally = document.createElement('div');
-  tally.className = 'tally ' + (pass === FIXTURES.length ? 'good' : 'bad');
-  tally.textContent = `${pass} / ${FIXTURES.length} fixtures passed` +
-                      (pass === FIXTURES.length ? '  — implementation matches the specification.' : '  — see failures below.');
-  out.appendChild(tally);
-
-  const t = document.createElement('table');
-  const head = document.createElement('tr');
-  ['Field', 'Input', 'Expected', 'Actual', 'Case'].forEach(h => {
-    const th = document.createElement('th'); th.textContent = h; head.appendChild(th);
-  });
-  t.appendChild(head);
-
-  rows.filter(r => !r.good).concat(rows.filter(r => r.good)).forEach(r => {
-    const tr = document.createElement('tr');
-    if (!r.good) tr.className = 'f';
-    const shown = r.value === '' ? '(empty)'
-                : r.value.length > 40 ? r.value.slice(0, 37) + '…'
-                : r.value.replace(/\u200B/g, '␀');
-    // A string verdict means the two name attributes disagreed on a shared case.
-    const actual = typeof r.got === 'string' ? `accept, ${r.got}`
-                 : r.got ? 'accept' : 'reject';
-    [r.type, shown, r.expect ? 'accept' : 'reject', actual, r.note]
-      .forEach((v, i) => {
-        const td = document.createElement('td');
-        td.textContent = v;
-        if (i === 1) td.className = 'v';
-        tr.appendChild(td);
-      });
-    t.appendChild(tr);
-  });
-  out.appendChild(t);
 });
 </script>
 </body>
