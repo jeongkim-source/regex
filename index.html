@@ -166,7 +166,7 @@
   <!-- ================= EMAIL ================= -->
   <section class="card" id="card-email">
     <h2>Email Address <span class="jp">メールアドレス</span></h2>
-    <p class="hint">The whole address must be ASCII: the local part (before <code>@</code>) and the domain alike. Internationalised domains (<span class="swatch">日本語.jp</span>) are <b>rejected</b>, and so is their punycode form — <code>xn--</code> falls foul of the double-hyphen rule. Wrong-width characters — full-width Latin (<span class="swatch">ｅｘａｍｐｌｅ</span>) and half-width katakana (<span class="swatch">ﾆﾎﾝ</span>) — are rejected everywhere in the address.</p>
+    <p class="hint">The whole address must be ASCII: the local part (before <code>@</code>) and the domain alike. Internationalised domains (<span class="swatch">日本語.jp</span>) are <b>not permitted</b>, in either form — neither the Unicode spelling nor its punycode equivalent (<code>xn--wgv71a119e.jp</code>). Wrong-width characters — full-width Latin (<span class="swatch">ｅｘａｍｐｌｅ</span>) and half-width katakana (<span class="swatch">ﾆﾎﾝ</span>) — are rejected everywhere in the address.</p>
     <div class="quick" data-for="email"></div>
     <div class="row">
       <!-- The h2 names this field; aria-label carries that name to the input itself,
@@ -182,7 +182,7 @@
         <b>Whole address</b> — one pattern, applied to the normalized value. Total length max 255.
         <pre class="re" id="re-email"></pre>
         <b>Local part</b> — ASCII letters, digits and <code>! # $ % &amp; ' * + / = ? ^ _ ` { | } ~ . -</code>, 1–64 characters. The address may not start with <code>% &amp; ' / ? ^ ` { | } ~ . -</code>, may not end the local part with <code>.</code> or <code>-</code>, and may contain no whitespace anywhere. <code>..</code> and <code>--</code> are refused; a dot beside a hyphen (<code>.-</code>) is not.
-        <b>Domain</b> — ASCII only: dot-separated labels of letters/digits/hyphen, 1–63 characters each, hyphen not at either end. TLD 2–63 letters, no digits. <code>--</code> is refused anywhere, which rules out punycode <code>xn--</code> labels as well.
+        <b>Domain</b> — ASCII only: dot-separated labels of letters/digits/hyphen, 1–63 characters each, hyphen not at either end. TLD 2–63 letters, no digits. <code>--</code> is refused anywhere, so punycode <code>xn--</code> labels are refused too — intentionally: IDN is out of scope for this field.
         <b>Normalization</b> — NFKC, then trim, then lowercase. Safe here because the field holds no kanji.
         Full-width Latin <code>U+FF21-U+FF3A / U+FF41-U+FF5A</code> and half-width katakana
         <code>U+FF61-U+FF9F</code> are excluded from the fold and <b>rejected</b>, on both sides of the
@@ -274,27 +274,43 @@ const INVISIBLE_ONE = /[\u0000-\u001F\u007F\u00AD\u200B-\u200D\u2028\u2029\u202A
 // Written in Java, where the property is spelt \p{IsLatin}; the JS equivalent
 // is \p{Script=Latin}, and nothing else about it is translated:
 //
-//   ^(?![ 　]+$)(?![\p{N}])[\p{IsLatin}\p{IsHan}\p{IsHiragana}ァ-ヺー-ヾ々〆・　 '’.\-\p{N}]{1,120}$
+//   ^(?![ 　]+$)(?![0-9０-９])[\p{IsLatin}\p{IsHan}\p{IsHiragana}ァ-ヺー-ヾ々〆・　 '’＇.\-0-9０-９]{1,120}$
+//
+// The digit member is written 0-9０-９, NOT \0-9０-９ as first drafted: \0 is an
+// octal escape, so java.util.regex refuses the pattern outright ("Illegal octal
+// escape sequence"), and a JS engine reads \0-9 as the range U+0000-U+0039 —
+// which would admit NUL, space and !"#$%&()*+,/ into a person's name. The
+// separately-listed ' . - are what give the intent away: every one of them
+// already falls inside U+0000-U+0039, so listing them only makes sense if the
+// digit member was meant to be the two digit ranges and nothing more.
 //
 // Worth knowing about what this admits:
 //   · space — 山田 太郎 is accepted, in either attribute;
-//   · digits are IN the class, so 太郎2 passes — but (?![\p{N}]) forbids one in
+//   · digits are IN the class, so 太郎2 passes — but (?![0-9０-９]) forbids one in
 //     first position, so 2太郎 does not;
+//   · digits means 0-9 and ０-９ only. Numerals from other scripts (٣ U+0663) and
+//     enclosed forms (① U+2460) are out — the earlier \p{N} spelling let them in;
 //   · \p{IsLatin} covers FULL-WIDTH Latin U+FF21-FF3A / U+FF41-FF5A, so
-//     Ｓｍｉｔｈ is accepted;
+//     Ｓｍｉｔｈ is accepted — and Roman numerals U+2160-217F with it, so 山田Ⅷ
+//     passes through \p{IsLatin} rather than through the digit member;
+//   · three apostrophes are listed — ' U+0027, ’ U+2019, ＇ U+FF07;
 //   · half-width katakana is out — U+FF61-FF9F is in none of the ranges;
 //   · the explicit katakana ranges ァ-ヺ ー-ヾ are used rather than
 //     \p{IsKatakana}, which would have dragged the half-width block back in.
+//
+// ＇ and ０-９ never actually reach the test on this page: normalizeName folds
+// U+FF01-FF20 to ASCII first, so they arrive as ' and 0-9. They stay in the
+// class for the server, which is the copy that has to stand on its own.
 const NAME_SPEC_JAVA =
-  "^(?![ 　]+$)(?![\\p{N}])[\\p{IsLatin}\\p{IsHan}\\p{IsHiragana}ァ-ヺー-ヾ々〆・　 '’.\\-\\p{N}]{1,120}$";
+  "^(?![ 　]+$)(?![0-9０-９])[\\p{IsLatin}\\p{IsHan}\\p{IsHiragana}ァ-ヺー-ヾ々〆・　 '’＇.\\-0-9０-９]{1,120}$";
 const NAME_RE =
-  /^(?![ 　]+$)(?![\p{N}])[\p{Script=Latin}\p{Script=Han}\p{Script=Hiragana}ァ-ヺー-ヾ々〆・　 '’.\-\p{N}]{1,120}$/u;
+  /^(?![ 　]+$)(?![0-9０-９])[\p{Script=Latin}\p{Script=Han}\p{Script=Hiragana}ァ-ヺー-ヾ々〆・　 '’＇.\-0-9０-９]{1,120}$/u;
 
 // Single-character form of the class above — same members, no anchors. The
 // leading-digit rule is positional, so it cannot live here; it is checked
 // separately in validateName.
 const NAME_CHAR_RE =
-  /^[\p{Script=Latin}\p{Script=Han}\p{Script=Hiragana}ァ-ヺー-ヾ々〆・　 '’.\-\p{N}]$/u;
+  /^[\p{Script=Latin}\p{Script=Han}\p{Script=Hiragana}ァ-ヺー-ヾ々〆・　 '’＇.\-0-9０-９]$/u;
 
 // Still needed by the furigana pair below.
 const SPACE_CLASS = "\\u0020\\u3000";
@@ -365,9 +381,13 @@ document.querySelectorAll('[data-namerule]').forEach(el => {
     '<code>U+FF21-U+FF3A / U+FF41-U+FF5A</code>, which <code>\\p{IsLatin}</code> covers · ' +
     'kanji (Han, incl. compatibility ideographs) · hiragana · full-width katakana ' +
     '<code>U+30A1-U+30FA</code> · <code>々 〆 ー ・ ヽ ヾ</code> · space and full-width space · ' +
-    '<code>&#39; ’ . -</code> · digits <code>\\p{N}</code> anywhere but first · ' +
+    'three apostrophes <code>&#39; ’ ＇</code> · <code>. -</code> · ' +
+    'digits <code>0-9 ０-９</code> anywhere but first · ' +
     'max 120 UTF-16 code units.<br><br>' +
-    '<b>Blocked</b> — a <b>leading digit</b>, by the <code>(?![\\p{N}])</code> lookahead · ' +
+    '<b>Blocked</b> — a <b>leading digit</b>, by the <code>(?![0-9０-９])</code> lookahead · ' +
+    'numerals that are not <code>0-9 ０-９</code>: Arabic-Indic <code>٣</code>, circled <code>①</code> ' +
+    'and the rest — the class names the two digit ranges rather than <code>\\p{N}</code>, so only those ' +
+    'get in (<code>Ⅷ</code> is the exception that proves it, admitted as a Latin letter, not a numeral) · ' +
     'half-width katakana <code>U+FF61-U+FF9F</code>, which is in none of the ranges — note the ' +
     'explicit <code>ァ-ヺ ー-ヾ</code> rather than <code>\\p{IsKatakana}</code>, which would have ' +
     'dragged that block back in · emoji · ' +
@@ -379,7 +399,9 @@ document.querySelectorAll('[data-namerule]').forEach(el => {
     'be wrong here: it rewrites 460 of the 512 CJK compatibility ideographs and would silently alter ' +
     'registered surnames.<br><br>' +
     'The fold runs <i>before</i> the pattern, so a full-width digit arrives as an ASCII digit: ' +
-    '<code>１２３</code> is rejected as a leading digit, not as a full-width one.';
+    '<code>１２３</code> is rejected as a leading digit, not as a full-width one. The same is true of ' +
+    '<code>＇</code> U+FF07, which reaches the test as <code>&#39;</code> — both stay in the class for ' +
+    'the server\'s copy of the rule, which runs without this page\'s normalization in front of it.';
   el.querySelector('[data-re="nameJava"]').textContent = NAME_SPEC_JAVA;
   el.querySelector('[data-re="name"]').textContent     = NAME_RE.source;
 });
@@ -464,6 +486,9 @@ function whyBlocked(ch) {
   if ((cp >= 0xFF21 && cp <= 0xFF3A) || (cp >= 0xFF41 && cp <= 0xFF5A)) return 'full-width Latin letter';
   if (ch >= '0' && ch <= '9')       return 'digit';
   try {
+    // Checked ahead of the script tests: ٣ is Arabic, but what makes it fail
+    // here is that it is a numeral the class does not list, not its script.
+    if (/\p{N}/u.test(ch)) return 'numeral other than 0-9';
     if (/\p{Extended_Pictographic}/u.test(ch)) return 'emoji / pictograph';
     if (/\p{Script=Hangul}/u.test(ch))   return 'Hangul (Korean)';
     if (/\p{Script=Cyrillic}/u.test(ch)) return 'Cyrillic';
@@ -570,10 +595,10 @@ function validateName(raw, which) {
 
   /* Step 4b — leading digit. Positional, so no single character is at fault
      and step 5 cannot report it: the digit is a member of the class. */
-  if (rule.noLeadingDigit && /^\p{N}/u.test(norm)) {
+  if (rule.noLeadingDigit && /^[0-9０-９]/u.test(norm)) {
     push('err', `Must not begin with a digit: "${Array.from(norm)[0]}" ${U(norm.codePointAt(0))}. ` +
                 `Digits are permitted inside ${label} — 太郎2 is accepted — but the pattern's ` +
-                `(?![\\p{N}]) lookahead rejects one in first position.`);
+                `(?![0-9０-９]) lookahead rejects one in first position.`);
   }
 
   /* Step 5 — per-character diagnosis */
@@ -742,7 +767,7 @@ function validateEmail(raw) {
   } else if (domain.startsWith('.') || domain.endsWith('.')) {
     push('err', `The domain must not begin or end with a dot.`);
   } else if (EMAIL_RUN_RE.test(domain)) {
-    push('err', `The domain contains "${domain.match(EMAIL_RUN_RE)[0]}" — a doubled dot or a doubled hyphen is not permitted, which rules out punycode labels ("xn--...") as well.`);
+    push('err', `The domain contains "${domain.match(EMAIL_RUN_RE)[0]}" — a doubled dot or a doubled hyphen is not permitted. Punycode labels ("xn--...") fall under this: internationalised domains are out of scope for this field.`);
   } else if (/[^\x00-\x7F]/.test(domain)) {
     // Wrong-width characters already carry their own, more precise message; this
     // branch still swallows them so the per-label checks below do not repeat it.
@@ -750,8 +775,8 @@ function validateEmail(raw) {
       const foreign = [...new Set(Array.from(domain).filter(c => c.codePointAt(0) > 127))];
       push('err', `The domain contains non-ASCII characters: ` +
                   foreign.slice(0, 6).map(c => `"${c}" ${U(c.codePointAt(0))}`).join(', ') +
-                  `. The domain must be ASCII letters, digits and hyphens — an internationalised domain is not accepted in either form, ` +
-                  `since its punycode equivalent begins "xn--" and a doubled hyphen is refused.`);
+                  `. The domain must be ASCII letters, digits and hyphens. Internationalised domains are out of scope for this field ` +
+                  `and are not accepted in either form — neither this spelling nor its punycode equivalent.`);
     }
   } else {
     const labels = domain.split('.');
@@ -832,6 +857,10 @@ const PRESETS = {
     ['warn', 'Full-width Latin',      'Ｓｍｉｔｈ'],
     ['bad',  'Half-width katakana',   'ﾔﾏﾀﾞ'],
     ['warn', 'Digits',                '山田123'],
+    ['bad',  'Circled digit',         '山田①'],
+    ['bad',  'Arabic-Indic digit',    '山田٣'],
+    ['ok',   'Full-width apostrophe', 'O＇Brien'],
+    ['warn', 'Roman numeral',         '山田Ⅷ'],
     ['bad',  'Full-width digits',     '１２３'],
     ['bad',  'Emoji',                 '😀'],
     ['bad',  'Markup',                '山田<script>'],
